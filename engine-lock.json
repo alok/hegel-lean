@@ -1,0 +1,24 @@
+{
+  "version": "0.43.1",
+  "tag": "libhegel-v0.43.1",
+  "commit": "9a130bfde99005504b0004428e047803ac18d3a0",
+  "repository": "https://github.com/hegeldev/hegel-rust",
+  "assets": {
+    "hegel.h": {
+      "url": "https://github.com/hegeldev/hegel-rust/releases/download/libhegel-v0.43.1/hegel.h",
+      "sha256": "39fe7b089ecb0aea5638bb28b50adfb59de4ecd86cc46fb9d71ced3428709add"
+    },
+    "libhegel-darwin-arm64.a": {
+      "url": "https://github.com/hegeldev/hegel-rust/releases/download/libhegel-v0.43.1/libhegel-darwin-arm64.a",
+      "sha256": "a3a7ce0cbc99cffb94738fe6b9c589ed632af3306b6501adecc686a0122f6cc5"
+    },
+    "libhegel-linux-amd64.a": {
+      "url": "https://github.com/hegeldev/hegel-rust/releases/download/libhegel-v0.43.1/libhegel-linux-amd64.a",
+      "sha256": "636277ef6c0a1520abeffc303f58fdf1683f0dba048afd76494a346bb366e2d8"
+    },
+    "libhegel-linux-arm64.a": {
+      "url": "https://github.com/hegeldev/hegel-rust/releases/download/libhegel-v0.43.1/libhegel-linux-arm64.a",
+      "sha256": "4ee09d79aa96c7584a9673293a0c5e2c1d354e50b3f76516c5bc6275748d4745"
+    }
+  }
+}

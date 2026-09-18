@@ -1,0 +1,6 @@
+.lake/
+.hegel/
+.env*
+*.pem
+__pycache__/
+.DS_Store

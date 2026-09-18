@@ -1,0 +1,42 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 16 * * 1'
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Lean
+        shell: bash
+        run: |
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - name: Build
+        run: lake build hegel_tests hegel_examples
+      - name: Check native ABI
+        run: python3 scripts/check_ffi.py
+      - name: Integration tests
+        run: lake test
+      - name: Passing and deliberately failing examples
+        shell: bash
+        run: |
+          lake exe hegel_examples
+          set +e
+          lake exe hegel_examples fail > failure.txt 2>&1
+          status=$?
+          set -e
+          cat failure.txt
+          test "$status" -eq 1
+          grep -F 'n = 5' failure.txt
+      - name: Downstream Lake dependency
+        run: python3 scripts/test_downstream.py

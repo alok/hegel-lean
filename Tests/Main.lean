@@ -1,5 +1,6 @@
 import Hegel
 import Lean.Data.Json
+import Tests.MacIver
 
 open Hegel Hegel.Property
 
@@ -156,3 +157,5 @@ def main : IO Unit := do
     "Closed session access was not rejected"
   IO.println "ok: thread confinement, idempotent close, and use-after-close rejection"
   IO.println "All Hegel integration tests passed."
+  let receipts ← Tests.MacIver.run
+  Tests.MacIver.writeReceipts ".lake/maciver-results.json" receipts

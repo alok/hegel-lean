@@ -159,6 +159,12 @@ Lean checks the frontend's types and the proof fields in `Fin` and `Vector`. Thi
 formal verification of Hegel or the C bridge**. The engine, compiler/runtime, native ABI, and C
 ownership code remain trusted. There are no `sorry` proofs or user-defined logical axioms.
 
+`lake test` also includes [regressions derived from David R. MacIver's blog](docs/maciver-tests.md):
+13 scenarios across three seeds, including the 70-copies-of-10 stress case, dependent generators,
+Unicode, and distinct NaN/empty-list failures. Two additional discovery probes preserve observed
+coverage misses in the output. Run `lake exe hegel_maciver_tests` for just this suite. CI uploads
+machine-readable results for every supported platform.
+
 The public API intentionally covers single-threaded properties and compositional generators.
 Native concurrent state machines, pools, calendar/UUID generators, source-location macros,
 and pretty-printer bindings are not implemented. No claim of full zizek API parity is made.

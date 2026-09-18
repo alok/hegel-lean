@@ -9,6 +9,7 @@ permissions:
   contents: read
 jobs:
   test:
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -22,11 +23,17 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Build
-        run: lake build hegel_tests hegel_examples
+        run: lake build hegel_tests hegel_examples hegel_maciver_tests
       - name: Check native ABI
         run: python3 scripts/check_ffi.py
       - name: Integration tests
         run: lake test
+      - name: Preserve MacIver test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: maciver-results-${{ matrix.os }}
+          path: .lake/maciver-results.json
+          if-no-files-found: error
       - name: Passing and deliberately failing examples
         shell: bash
         run: |

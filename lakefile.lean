@@ -33,5 +33,11 @@ lean_lib Hegel where
 lean_exe hegel_tests where
   root := `Tests.Main
 
+lean_lib Tests where
+  roots := #[`Tests.MacIver]
+
 lean_exe hegel_examples where
   root := `Examples.Main
+
+lean_exe hegel_maciver_tests where
+  root := `Tests.MacIverMain

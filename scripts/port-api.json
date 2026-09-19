@@ -1,0 +1,1676 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "6b25365f6c6e2d9bbe6970a3eb892ba4c076e241",
+  "engineCommit": "9a130bfde99005504b0004428e047803ac18d3a0",
+  "statusDefinitions": {
+    "implemented_unverified": "Implementation written or actively being integrated; required semantic tests have not all passed.",
+    "verified": "Listed tests passed against the implementation; notes state intentional adaptations.",
+    "pending": "Substantive semantics remain absent."
+  },
+  "features": [
+    {
+      "id": "settings",
+      "sourceModules": [
+        "Hegel.Settings",
+        "Hegel.Phase",
+        "Hegel.Backend",
+        "Hegel.HealthCheck",
+        "Hegel.Verbosity",
+        "Hegel.Database"
+      ],
+      "leanTargets": [
+        "Hegel.Settings",
+        "Hegel.Internal.configure"
+      ],
+      "tests": [
+        "reporting/settings validation and enum masks",
+        "reporting/native deterministic settings"
+      ],
+      "contract": "Configure all case counts, stateful steps, seed, derandomization, database identity, phases, backends, verbosity, failure policy, health checks, clone depth before campaign start.",
+      "status": "verified",
+      "notes": "Original Lean default persistence and multiple-failure settings retained. Nat and UInt64 make negative limits unrepresentable. auto selects urandom only under the Antithesis SDK environment."
+    },
+    {
+      "id": "primitive_generators",
+      "sourceModules": [
+        "Hegel.Gen.Bool",
+        "Hegel.Gen.Integer",
+        "Hegel.Gen.Float",
+        "Hegel.Gen.Binary"
+      ],
+      "leanTargets": [
+        "Hegel.Gen.bool",
+        "Hegel.Gen.int",
+        "Hegel.Gen.nat",
+        "Hegel.Gen.int8",
+        "Hegel.Gen.int16",
+        "Hegel.Gen.int32",
+        "Hegel.Gen.int64",
+        "Hegel.Gen.uint8",
+        "Hegel.Gen.uint16",
+        "Hegel.Gen.uint32",
+        "Hegel.Gen.uint64",
+        "Hegel.Gen.usize",
+        "Hegel.Gen.isize",
+        "Hegel.Gen.float",
+        "Hegel.Gen.float32",
+        "Hegel.Gen.bytes"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Native draws preserve signed arbitrary precision, bounded widths, weights, floating boundaries/NaN/infinity and bytes.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "generator_builders",
+      "sourceModules": [
+        "Hegel.Gen.Builder"
+      ],
+      "leanTargets": [
+        "Hegel.Gen.Build",
+        "Hegel.Gen.HasMin",
+        "Hegel.Gen.HasMax",
+        "Hegel.Gen.HasSize",
+        "Hegel.Gen.Builder.integer",
+        "Hegel.Gen.Builder.list",
+        "Hegel.Gen.Builder.float",
+        "Hegel.Gen.Builder.text"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Typed Build, HasMin, HasMax, HasSize, HasYear and HasAlphabet provide fluent generator configuration.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "collections",
+      "sourceModules": [
+        "Hegel.Gen.List",
+        "Hegel.Gen.NonEmpty",
+        "Hegel.Gen.Set",
+        "Hegel.Gen.HashSet",
+        "Hegel.Gen.IntSet",
+        "Hegel.Gen.Map",
+        "Hegel.Gen.HashMap",
+        "Hegel.Gen.IntMap",
+        "Hegel.Collection"
+      ],
+      "leanTargets": [
+        "Hegel.Gen.list",
+        "Hegel.Gen.nonEmpty",
+        "Hegel.Gen.set",
+        "Hegel.Gen.hashSet",
+        "Hegel.Gen.intSet",
+        "Hegel.Gen.map",
+        "Hegel.Gen.hashMap",
+        "Hegel.Gen.intMap",
+        "Hegel.Collection"
+      ],
+      "tests": [
+        "Tests.Generators.run",
+        "Tests.Stateful.run"
+      ],
+      "contract": "Engine collection lengths, uniqueness rejection, key/value preservation, and scoped collection cleanup.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "alphabet",
+      "sourceModules": [
+        "Hegel.Alphabet",
+        "Hegel.Gen.Char",
+        "Hegel.Gen.Text"
+      ],
+      "leanTargets": [
+        "Hegel.Alphabet"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Codecs, character ranges, Unicode categories and explicit include/exclude character sets compose through native engine alphabets; all named presets are available.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "format_generators",
+      "sourceModules": [
+        "Hegel.Gen.Regex",
+        "Hegel.Gen.Domain",
+        "Hegel.Gen.Email",
+        "Hegel.Gen.Uri",
+        "Hegel.Gen.Uuid"
+      ],
+      "leanTargets": [
+        "Hegel.Alphabet.regex",
+        "Hegel.Gen.regex",
+        "Hegel.Gen.domain",
+        "Hegel.Gen.email",
+        "Hegel.Gen.uri",
+        "Hegel.Gen.uriText",
+        "Hegel.Gen.uuid",
+        "Hegel.URIAuth",
+        "Hegel.URI.parse"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Native format generation; UUID version/variant constraints; structured URI preserves generated encoded components.",
+      "status": "verified",
+      "notes": "URI parser supports the generated HTTP(S) language; it is not a general URI parser."
+    },
+    {
+      "id": "temporal_generators",
+      "sourceModules": [
+        "Hegel.Gen.Date",
+        "Hegel.Gen.Time",
+        "Hegel.Gen.DateTime",
+        "Hegel.Gen.Duration"
+      ],
+      "leanTargets": [
+        "Hegel.Date",
+        "Hegel.Time",
+        "Hegel.DateTime",
+        "Hegel.Duration",
+        "Hegel.Gen.date",
+        "Hegel.Gen.time",
+        "Hegel.Gen.datetime",
+        "Hegel.Gen.duration"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Validated calendar bounds, leap years, temporal interval constraints, onDay and exact picosecond durations.",
+      "status": "verified",
+      "notes": "Native time precision is nanoseconds, exceeding the reference microsecond precision."
+    },
+    {
+      "id": "recursive_generators",
+      "sourceModules": [
+        "Hegel.Gen.Recursive"
+      ],
+      "leanTargets": [
+        "Hegel.Gen.RecursiveBuilder",
+        "Hegel.Gen.recursiveNative",
+        "Hegel.Gen.maxDepth",
+        "Hegel.Gen.maxLeaves"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Native recursion budgets share leaf/depth limits, expose recursion context and reject exhausted recursive draws.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "generator_combinators",
+      "sourceModules": [
+        "Hegel.Gen.Internal"
+      ],
+      "leanTargets": [
+        "Hegel.Gen.frequency",
+        "Hegel.Gen.either",
+        "Hegel.Gen.option",
+        "Hegel.Gen.filter",
+        "Hegel.Gen.filtered",
+        "Hegel.Gen.mapMaybe",
+        "Hegel.Gen.just",
+        "Hegel.Gen.defer"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Monadic dependency, weighted branches, optional values, bounded filtering, exception-safe shrinking spans and lazy construction.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "finite_enumeration",
+      "sourceModules": [
+        "Hegel.Gen.Internal",
+        "Hegel.Gen.Integer"
+      ],
+      "leanTargets": [
+        "Hegel.Gen.enumerate",
+        "Hegel.Gen.enum",
+        "Hegel.Gen.enumBounded"
+      ],
+      "tests": [
+        "Tests.Generators.run"
+      ],
+      "contract": "Finite alternatives propagate through generator composition; unsupported infinite enumeration is rejected explicitly.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "property_effects",
+      "sourceModules": [
+        "Hegel.Property"
+      ],
+      "leanTargets": [
+        "Hegel.PropertyT",
+        "Hegel.Property.hoist",
+        "Hegel.Property.io",
+        "Hegel.Property.assume",
+        "Hegel.Property.discard"
+      ],
+      "tests": [
+        "Tests.Main"
+      ],
+      "contract": "Interleave reproducible draws and explicit effects; preserve rejection and error outcomes through natural-transformer hoists.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "observations",
+      "sourceModules": [
+        "Hegel.Property"
+      ],
+      "leanTargets": [
+        "Hegel.Property.forAll",
+        "Hegel.Property.forAllWith",
+        "Hegel.Property.forAllWithLabel",
+        "Hegel.Property.forAllSilent",
+        "Hegel.Property.annotate",
+        "Hegel.Property.annotateShow",
+        "Hegel.Property.footnote"
+      ],
+      "tests": [
+        "Tests.Reporting.run"
+      ],
+      "contract": "Draw labels, custom rendering, silent draws, annotations and footnotes retained in final replay journals.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "resource_lifecycle",
+      "sourceModules": [
+        "Hegel.Property"
+      ],
+      "leanTargets": [
+        "Hegel.Property.registerFinalizer",
+        "Hegel.Property.resource",
+        "Hegel.Property.resource_"
+      ],
+      "tests": [
+        "Tests.Safety.run",
+        "Tests.Concurrency.run"
+      ],
+      "contract": "Per-case cleanup runs once in reverse registration order on pass, discard, failure and error; cleanup diagnostics prevent false success.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "assertions",
+      "sourceModules": [
+        "Hegel.Assertion"
+      ],
+      "leanTargets": [
+        "Hegel.Assertion.failureAt",
+        "Hegel.Assertion.assertAt",
+        "Hegel.Assertion.equalAt",
+        "Hegel.Assertion.notEqualAt",
+        "Hegel.Assertion.MonadAssertion",
+        "Hegel.Assertion.IOEnvelope.encode",
+        "Hegel.Assertion.IOEnvelope.decode"
+      ],
+      "tests": [
+        "reporting/source assertions shrinking and replay"
+      ],
+      "contract": "Compile-time Lean source positions generate stable module/line/column failure origins and preserve assertion diffs independently of varying values. Assertions work in Property and IO callbacks; a dedicated typed error code and exact envelope tag preserve IO evidence without misclassifying ordinary user-error text.",
+      "status": "verified",
+      "notes": "",
+      "syntax": [
+        "assert!",
+        "assertEq!",
+        "assertNe!",
+        "failure!",
+        "forAll!"
+      ]
+    },
+    {
+      "id": "diffs",
+      "sourceModules": [
+        "Hegel.Diff"
+      ],
+      "leanTargets": [
+        "Hegel.diffValues",
+        "Hegel.diffShown",
+        "Hegel.diffLines",
+        "Hegel.renderDiff"
+      ],
+      "tests": [
+        "reporting/structural and line differences"
+      ],
+      "contract": "Structural differences preserve matching collection/record context and quote escaping; unsupported representations fall back to line differences.",
+      "status": "verified",
+      "notes": "Parses balanced Lean Repr collection/record syntax, not Haskell Show syntax."
+    },
+    {
+      "id": "sampling",
+      "sourceModules": [
+        "Hegel.Runner"
+      ],
+      "leanTargets": [
+        "Hegel.sample",
+        "Hegel.samples"
+      ],
+      "tests": [
+        "Tests.Safety.run"
+      ],
+      "contract": "sample executes one native case and rejects on discard or overrun; samples collects up to the requested count in one generation-only campaign.",
+      "status": "verified",
+      "notes": "The pinned engine removed the legacy single-case mode. A one-case budget with one next-case call preserves the single-sample contract; finite-space exhaustion may shorten multi-sampling."
+    },
+    {
+      "id": "runner",
+      "sourceModules": [
+        "Hegel.Runner",
+        "Hegel.Property"
+      ],
+      "leanTargets": [
+        "Hegel.check",
+        "Hegel.check!",
+        "Hegel.runTests",
+        "Hegel.prop",
+        "Hegel.Property.forEach",
+        "Hegel.Property.forEachWith"
+      ],
+      "tests": [
+        "Tests.Main",
+        "Tests.MacIver.run"
+      ],
+      "contract": "Campaign execution, shrinking, multiple-origin failures and no-valid-case handling; assertion panics cannot produce passing test process exit codes.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "replay",
+      "sourceModules": [
+        "Hegel.Replay"
+      ],
+      "leanTargets": [
+        "Hegel.ReplayToken",
+        "Hegel.encodeReplayToken",
+        "Hegel.decodeReplayToken",
+        "Hegel.replayToken"
+      ],
+      "tests": [
+        "Tests.Replay.run"
+      ],
+      "contract": "Versioned envelopes preserve UTF-8 origins and blobs; replay reports invalid envelopes, wrong versions, changed origin, exhaustion and unexpected success/discard.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "report_evidence",
+      "sourceModules": [
+        "Hegel.Report"
+      ],
+      "leanTargets": [
+        "Hegel.FailureEvidenceStatus",
+        "Hegel.ReplayReason",
+        "Hegel.SkipReason",
+        "Hegel.CleanupDiagnostic",
+        "Hegel.Stats",
+        "Hegel.Reproduction",
+        "Hegel.Report"
+      ],
+      "tests": [
+        "Tests.Main",
+        "Tests.Reporting.run"
+      ],
+      "contract": "Each failure retains reconstructed/diverged/skipped/live-observed evidence; valid/invalid/replay counts and cleanup failures remain explicit.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "report_journal",
+      "sourceModules": [
+        "Hegel.Report.Note",
+        "Hegel.Report.Journal"
+      ],
+      "leanTargets": [
+        "Hegel.Note",
+        "Hegel.NoteKind",
+        "Hegel.Journal.render"
+      ],
+      "tests": [
+        "reporting/notes traces and source fallbacks"
+      ],
+      "contract": "Nested notes preserve ordered draws, per-step numbering, response/failure branches, and footnotes at the end.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "report_source",
+      "sourceModules": [
+        "Hegel.Report.Source",
+        "Hegel.Report.Discovery",
+        "Hegel.Report.Span"
+      ],
+      "leanTargets": [
+        "Hegel.SourceLocation",
+        "Hegel.Journal.renderSource"
+      ],
+      "tests": [
+        "reporting/notes traces and source fallbacks"
+      ],
+      "contract": "Lean source positions and bounded source context enhance diagnostics; inaccessible files degrade to portable locations.",
+      "status": "verified",
+      "notes": "Lean macros capture exact source spans directly; no Haskell declaration scanner is needed."
+    },
+    {
+      "id": "report_trace",
+      "sourceModules": [
+        "Hegel.Report.Trace",
+        "Hegel.Report.Stateful",
+        "Hegel.Report.Concurrent"
+      ],
+      "leanTargets": [
+        "Hegel.PoolVar",
+        "Hegel.PoolEvent",
+        "Hegel.Trace.build",
+        "Hegel.Trace.step",
+        "Hegel.Trace.root",
+        "Hegel.Trace.identity",
+        "Hegel.Trace.displayName",
+        "Hegel.Trace.layoutRows",
+        "Hegel.Trace.renderWith"
+      ],
+      "tests": [
+        "reporting/notes traces and source fallbacks",
+        "Tests.Stateful.run"
+      ],
+      "contract": "Join ordered pool events and stateful steps, track transfer lineage, and retain in-band concurrent branch failures. Transfer lineage determines relevance elision; custom names and round/worker/group origins are retained.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "report_style",
+      "sourceModules": [
+        "Hegel.Report.Style",
+        "Hegel.Report.Ann",
+        "Hegel.Report.Encoding",
+        "Hegel.Report.Layout"
+      ],
+      "leanTargets": [
+        "Hegel.OutputPreference",
+        "Hegel.ReportStyle",
+        "Hegel.ReportStyle.finish",
+        "Hegel.Journal.renderWith",
+        "Hegel.Journal.renderSourceWith",
+        "Hegel.GlyphTable",
+        "Hegel.PhraseTable",
+        "Hegel.ReportStyle.resolve"
+      ],
+      "tests": [
+        "reporting/notes traces and source fallbacks"
+      ],
+      "contract": "ANSI/plain and ASCII/Unicode preferences, configurable rendering budgets, chronology and source output selection.",
+      "status": "verified",
+      "notes": "Component rendering supports ANSI/plain text, whole-output ASCII escaping, source/value/call budgets and custom glyph/phrase tables. Report-level wrappers are validated with the complete suite."
+    },
+    {
+      "id": "pools",
+      "sourceModules": [
+        "Hegel.Pool"
+      ],
+      "leanTargets": [
+        "Hegel.Pool.new",
+        "Hegel.Pool.named",
+        "Hegel.Pool.add",
+        "Hegel.Pool.size",
+        "Hegel.Pool.isEmpty",
+        "Hegel.Pool.reuse",
+        "Hegel.Pool.consume",
+        "Hegel.Pool.transfer"
+      ],
+      "tests": [
+        "Tests.Stateful.run"
+      ],
+      "contract": "Engine-owned shrinking identities, empty-pool discard, consume semantics, transfer lineage and shared native handle release.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "stateful",
+      "sourceModules": [
+        "Hegel.Stateful"
+      ],
+      "leanTargets": [
+        "Hegel.Stateful.Rule",
+        "Hegel.Stateful.Invariant",
+        "Hegel.Stateful.Machine",
+        "Hegel.Stateful.run",
+        "Hegel.Stateful.respond",
+        "Hegel.Stateful.respondShow"
+      ],
+      "tests": [
+        "Tests.Stateful.run"
+      ],
+      "contract": "Native swarm selection, initialization/invariants, rejected steps do not discard the case, stateful step budgets and trace replay.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "stateful_concurrent",
+      "sourceModules": [
+        "Hegel.Stateful.Concurrent"
+      ],
+      "leanTargets": [
+        "Hegel.Stateful.Concurrent.Machine",
+        "Hegel.Stateful.Concurrent.run",
+        "Hegel.Stateful.Concurrent.fixed",
+        "Hegel.Stateful.Concurrent.between"
+      ],
+      "tests": [
+        "Tests.Stateful.run"
+      ],
+      "contract": "Native grouped rule selection, real worker overlap, joined invariants, nondeterministic failures retain observed evidence without fake replay.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "forks",
+      "sourceModules": [
+        "Hegel.Property.Fork"
+      ],
+      "leanTargets": [
+        "Hegel.Property.Fork.spawn",
+        "Hegel.Property.Fork.join",
+        "Hegel.Property.Fork.cancel",
+        "Hegel.Property.Fork.poll",
+        "Hegel.Property.Fork.\u00abscoped\u00bb"
+      ],
+      "tests": [
+        "Tests.Concurrency.run"
+      ],
+      "contract": "Independent native clone streams, explicit join/cancel/poll/scoped lifetime, unjoined-fork errors and nesting limits.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "branches",
+      "sourceModules": [
+        "Hegel.Property.Branch"
+      ],
+      "leanTargets": [
+        "Hegel.Property.Branch.concurrently",
+        "Hegel.Property.Branch.concurrently_",
+        "Hegel.Property.Branch.mapConcurrently",
+        "Hegel.Property.Branch.forConcurrently",
+        "Hegel.Property.Branch.replicateConcurrently",
+        "Hegel.Property.Branch.replicateConcurrentlyBounded",
+        "Hegel.Property.Branch.withWorkers"
+      ],
+      "tests": [
+        "Tests.Concurrency.run"
+      ],
+      "contract": "Concurrent pair/map/for/replicate/bounded fanout preserves input order and folds every branch failure before choosing the stable shrink origin.",
+      "status": "verified",
+      "notes": ""
+    },
+    {
+      "id": "test_frameworks",
+      "sourceModules": [
+        "Hegel.Hspec",
+        "Hegel.Tasty"
+      ],
+      "leanTargets": [
+        "Hegel.runTests"
+      ],
+      "tests": [
+        "python3 scripts/test_downstream.py",
+        "lake test"
+      ],
+      "contract": "Lake test integration provides named test execution, configurable settings and failure exit codes.",
+      "status": "verified",
+      "notes": "Language-specific Hspec/Tasty bindings are represented by Lean Lake test support.",
+      "commands": [
+        "lake test"
+      ]
+    }
+  ],
+  "sourceApi": [
+    {
+      "module": "Hegel.Alphabet",
+      "exports": [
+        "only",
+        "CodepointRange",
+        "ranges",
+        "ascii",
+        "asciiPrintable",
+        "lower",
+        "upper",
+        "alpha",
+        "digit",
+        "alphaNum",
+        "binit",
+        "octit",
+        "hexit",
+        "latin1",
+        "unicode",
+        "asciiPunctuation",
+        "base64",
+        "base64Url",
+        "uriUnreserved",
+        "whitespace",
+        "combiningMarks",
+        "zeroWidth",
+        "bidiControls"
+      ],
+      "featureIds": [
+        "alphabet"
+      ]
+    },
+    {
+      "module": "Hegel.Assertion",
+      "exports": [
+        "AssertionFailure (..)",
+        "assert",
+        "failure",
+        "(===)",
+        "(/==)",
+        "originOf",
+        "callSite"
+      ],
+      "featureIds": [
+        "assertions"
+      ]
+    },
+    {
+      "module": "Hegel.Backend",
+      "exports": [
+        "Backend (..)"
+      ],
+      "featureIds": [
+        "settings"
+      ]
+    },
+    {
+      "module": "Hegel.Collection",
+      "exports": [
+        "Collection",
+        "with",
+        "more",
+        "reject"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Database",
+      "exports": [
+        "Database (..)"
+      ],
+      "featureIds": [
+        "settings"
+      ]
+    },
+    {
+      "module": "Hegel.Diff",
+      "exports": [
+        "LineDiff (..)",
+        "Diff",
+        "diffValues",
+        "diffShown",
+        "diffLines",
+        "renderDiff"
+      ],
+      "featureIds": [
+        "diffs"
+      ]
+    },
+    {
+      "module": "Hegel.Exception",
+      "exports": [
+        "Diagnostic (..)",
+        "ValidationError (..)",
+        "SettingsError (..)",
+        "MalformedTest (..)",
+        "HegelError (..)",
+        "InvariantViolation (..)"
+      ],
+      "featureIds": []
+    },
+    {
+      "module": "Hegel.Gen.Binary",
+      "exports": [
+        "BinaryBuilder",
+        "binary"
+      ],
+      "featureIds": [
+        "primitive_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Bool",
+      "exports": [
+        "BoolBuilder",
+        "bool",
+        "weighted"
+      ],
+      "featureIds": [
+        "primitive_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Builder",
+      "exports": [
+        "Build (..)",
+        "HasMin (..)",
+        "HasMax (..)",
+        "HasSize (..)",
+        "HasYear (..)",
+        "ValidationError (..)",
+        "checkOrdered",
+        "checkOrderedMaybe",
+        "checkNonNegative",
+        "checkNonNegativeNamed",
+        "checkSizeBounds"
+      ],
+      "featureIds": [
+        "generator_builders"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Char",
+      "exports": [
+        "CharBuilder",
+        "char",
+        "Codec (..)",
+        "codec",
+        "minCodepoint",
+        "maxCodepoint",
+        "categories",
+        "excludeCategories",
+        "includeCharacters",
+        "excludeCharacters",
+        "HasAlphabet (..)",
+        "buildCharTextGen"
+      ],
+      "featureIds": [
+        "alphabet"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Date",
+      "exports": [
+        "DateBuilder",
+        "date",
+        "checkYearRange"
+      ],
+      "featureIds": [
+        "temporal_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.DateTime",
+      "exports": [
+        "DateTimeBuilder",
+        "datetime",
+        "onDay"
+      ],
+      "featureIds": [
+        "temporal_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Domain",
+      "exports": [
+        "DomainBuilder",
+        "domain",
+        "maxLength"
+      ],
+      "featureIds": [
+        "format_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Duration",
+      "exports": [
+        "DurationBuilder",
+        "duration",
+        "milliseconds",
+        "seconds",
+        "minutes",
+        "hours"
+      ],
+      "featureIds": [
+        "temporal_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Email",
+      "exports": [
+        "EmailBuilder",
+        "email"
+      ],
+      "featureIds": [
+        "format_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Float",
+      "exports": [
+        "FloatBuilder",
+        "float",
+        "double",
+        "exclusiveMin",
+        "exclusiveMax",
+        "disallowNan",
+        "disallowInfinity"
+      ],
+      "featureIds": [
+        "primitive_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.HashMap",
+      "exports": [
+        "HashMapBuilder",
+        "hashMap"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.HashSet",
+      "exports": [
+        "HashSetBuilder",
+        "hashSet"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.IntMap",
+      "exports": [
+        "IntMapBuilder",
+        "intMap"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.IntSet",
+      "exports": [
+        "IntSetBuilder",
+        "intSet"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Integer",
+      "exports": [
+        "IntegralBuilder",
+        "integral",
+        "int",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "word",
+        "word8",
+        "word16",
+        "word32",
+        "word64",
+        "enum",
+        "enumBounded"
+      ],
+      "featureIds": [
+        "primitive_generators",
+        "finite_enumeration"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.List",
+      "exports": [
+        "ListBuilder",
+        "list",
+        "unique"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Map",
+      "exports": [
+        "MapBuilder",
+        "map"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.NonEmpty",
+      "exports": [
+        "NonEmptyBuilder",
+        "nonEmpty"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Recursive",
+      "exports": [
+        "RecursiveBuilder",
+        "recursive",
+        "maxDepth",
+        "maxLeaves",
+        "RecursionContext (..)",
+        "retryLoopWith"
+      ],
+      "featureIds": [
+        "recursive_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Regex",
+      "exports": [
+        "RegexBuilder",
+        "regex",
+        "fullMatch"
+      ],
+      "featureIds": [
+        "format_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Set",
+      "exports": [
+        "SetBuilder",
+        "set"
+      ],
+      "featureIds": [
+        "collections"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Text",
+      "exports": [
+        "TextBuilder",
+        "text"
+      ],
+      "featureIds": [
+        "alphabet"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Time",
+      "exports": [
+        "TimeBuilder",
+        "time",
+        "checkFields"
+      ],
+      "featureIds": [
+        "temporal_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Uri",
+      "exports": [
+        "UriBuilder",
+        "uri",
+        "UriTextBuilder",
+        "uriText"
+      ],
+      "featureIds": [
+        "format_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen.Uuid",
+      "exports": [
+        "UuidBuilder",
+        "uuid",
+        "version"
+      ],
+      "featureIds": [
+        "format_generators"
+      ]
+    },
+    {
+      "module": "Hegel.Gen",
+      "exports": [
+        "TestCase",
+        "Build (build)",
+        "HasMin (min)",
+        "HasMax (max)",
+        "HasSize (minSize, maxSize)",
+        "HasYear (minYear, maxYear)",
+        "HasAlphabet (alphabet)",
+        "BoolBuilder",
+        "bool",
+        "weighted",
+        "IntegralBuilder",
+        "integral",
+        "int",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "word",
+        "word8",
+        "word16",
+        "word32",
+        "word64",
+        "enum",
+        "enumBounded",
+        "FloatBuilder",
+        "float",
+        "double",
+        "exclusiveMin",
+        "exclusiveMax",
+        "disallowNan",
+        "disallowInfinity",
+        "BinaryBuilder",
+        "binary",
+        "ListBuilder",
+        "list",
+        "unique",
+        "NonEmptyBuilder",
+        "nonEmpty",
+        "RecursiveBuilder",
+        "recursive",
+        "maxDepth",
+        "maxLeaves",
+        "RecursionContext (..)",
+        "SetBuilder",
+        "set",
+        "HashSetBuilder",
+        "hashSet",
+        "IntSetBuilder",
+        "intSet",
+        "MapBuilder",
+        "map",
+        "HashMapBuilder",
+        "hashMap",
+        "IntMapBuilder",
+        "intMap",
+        "TextBuilder",
+        "text",
+        "CharBuilder",
+        "char",
+        "Codec (..)",
+        "codec",
+        "minCodepoint",
+        "maxCodepoint",
+        "categories",
+        "excludeCategories",
+        "includeCharacters",
+        "excludeCharacters",
+        "UuidBuilder",
+        "uuid",
+        "version",
+        "UriBuilder",
+        "uri",
+        "UriTextBuilder",
+        "uriText",
+        "DomainBuilder",
+        "domain",
+        "maxLength",
+        "EmailBuilder",
+        "email",
+        "DateBuilder",
+        "date",
+        "TimeBuilder",
+        "time",
+        "DateTimeBuilder",
+        "datetime",
+        "onDay",
+        "DurationBuilder",
+        "duration",
+        "milliseconds",
+        "seconds",
+        "minutes",
+        "hours",
+        "RegexBuilder",
+        "regex",
+        "fullMatch",
+        "oneOf",
+        "element",
+        "frequency",
+        "maybe",
+        "either",
+        "draw",
+        "assume",
+        "discard",
+        "defer",
+        "filtered",
+        "mapMaybe",
+        "just",
+        "enumerate",
+        "AssumeRejected (..)",
+        "ValidationError (..)"
+      ],
+      "featureIds": []
+    },
+    {
+      "module": "Hegel.HealthCheck",
+      "exports": [
+        "HealthCheck (..)"
+      ],
+      "featureIds": [
+        "settings"
+      ]
+    },
+    {
+      "module": "Hegel.Hspec",
+      "exports": [
+        "prop",
+        "propT",
+        "propWith",
+        "propWithT",
+        "propFor",
+        "propForWith",
+        "propModify",
+        "propForModify",
+        "propModifyT"
+      ],
+      "featureIds": [
+        "test_frameworks"
+      ]
+    },
+    {
+      "module": "Hegel.Phase",
+      "exports": [
+        "Phase (..)"
+      ],
+      "featureIds": [
+        "settings"
+      ]
+    },
+    {
+      "module": "Hegel.Pool",
+      "exports": [
+        "Pool",
+        "new",
+        "named",
+        "add",
+        "size",
+        "isEmpty",
+        "reuse",
+        "consume",
+        "transfer"
+      ],
+      "featureIds": [
+        "pools"
+      ]
+    },
+    {
+      "module": "Hegel.Property.Branch",
+      "exports": [
+        "concurrently",
+        "concurrently_",
+        "mapConcurrently",
+        "mapConcurrently_",
+        "forConcurrently",
+        "forConcurrently_",
+        "replicateConcurrently",
+        "replicateConcurrently_",
+        "replicateConcurrentlyBounded"
+      ],
+      "featureIds": [
+        "branches"
+      ]
+    },
+    {
+      "module": "Hegel.Property.Fork",
+      "exports": [
+        "Fork",
+        "spawn",
+        "join",
+        "cancel",
+        "poll",
+        "scoped"
+      ],
+      "featureIds": [
+        "forks"
+      ]
+    },
+    {
+      "module": "Hegel.Property",
+      "exports": [
+        "Property",
+        "PropertyT",
+        "hoist",
+        "check",
+        "check_",
+        "forEach",
+        "forEachWith",
+        "forAll",
+        "forAllWith",
+        "forAllWithLabel",
+        "forAllSilent",
+        "annotate",
+        "annotateShow",
+        "footnote",
+        "assume",
+        "discard",
+        "registerFinalizer",
+        "resource",
+        "resource_",
+        "Fork",
+        "assert",
+        "failure",
+        "(===)",
+        "(/==)"
+      ],
+      "featureIds": [
+        "property_effects",
+        "observations",
+        "resource_lifecycle",
+        "runner"
+      ]
+    },
+    {
+      "module": "Hegel.Replay",
+      "exports": [
+        "ReplayToken",
+        "ReplayError (..)",
+        "encodeReplayToken",
+        "decodeReplayToken",
+        "replayTokenOrigin",
+        "replayTokenVersion"
+      ],
+      "featureIds": [
+        "replay"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Ann",
+      "exports": [
+        "Ann (..)",
+        "Style (..)",
+        "docToText",
+        "docToAnsi",
+        "diffDocs"
+      ],
+      "featureIds": [
+        "report_style"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Concurrent",
+      "exports": [
+        "concurrentGroupsDoc"
+      ],
+      "featureIds": [
+        "report_trace"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Discovery",
+      "exports": [
+        "Declarations",
+        "loadDeclarations",
+        "lookupDeclaration",
+        "findDeclarations",
+        "Pos (..)",
+        "Position (..)"
+      ],
+      "featureIds": [
+        "report_source"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Encoding",
+      "exports": [
+        "Preference (..)",
+        "preference",
+        "cleanFor",
+        "sevenBitClean",
+        "sevenBitCleanWith",
+        "baseTransliterations"
+      ],
+      "featureIds": [
+        "report_style"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Journal",
+      "exports": [
+        "groupByDepth",
+        "numberDraws",
+        "Group (..)",
+        "toGroups",
+        "journalDocs",
+        "footnoteDocs",
+        "noteLineDoc",
+        "noteLineAtDepth",
+        "locDoc",
+        "headlineBlock"
+      ],
+      "featureIds": [
+        "report_journal"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Layout",
+      "exports": [
+        "RowKind (..)",
+        "Row (..)",
+        "layoutRows",
+        "logDoc",
+        "displayName"
+      ],
+      "featureIds": [
+        "report_style"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Note",
+      "exports": [
+        "Note (..)",
+        "NoteKind (..)",
+        "hasInBandFailure",
+        "isDrawn",
+        "isFailureNote",
+        "isBranchHeader",
+        "isBranchFailure",
+        "renderValue"
+      ],
+      "featureIds": [
+        "report_journal"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Source",
+      "exports": [
+        "Line (..)",
+        "Declaration (..)",
+        "Annotation",
+        "Context (..)",
+        "lookupDeclarationSpan",
+        "ppFailedInput",
+        "ppInlinedValue",
+        "ppFailureLocation",
+        "ppDeclaration",
+        "renderListings",
+        "mergeDeclarations",
+        "mergeFileDeclarations",
+        "applyContext",
+        "defaultContext"
+      ],
+      "featureIds": [
+        "report_source"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Span",
+      "exports": [
+        "LineNo (..)",
+        "ColumnNo (..)",
+        "Span (..)",
+        "spanFromSrcLoc"
+      ],
+      "featureIds": [
+        "report_source"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Stateful",
+      "exports": [
+        "failingGroupDoc",
+        "noteFiles",
+        "JournalShape (..)",
+        "classifyJournal"
+      ],
+      "featureIds": [
+        "report_trace"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Style",
+      "exports": [
+        "Style (..)",
+        "defaultStyle",
+        "Cell (..)",
+        "GlyphTable (..)",
+        "unicode",
+        "ascii",
+        "PhraseTable (..)",
+        "english",
+        "firstLine",
+        "Preference (..)",
+        "preference",
+        "table",
+        "cleanFor",
+        "sevenBitClean"
+      ],
+      "featureIds": [
+        "report_style"
+      ]
+    },
+    {
+      "module": "Hegel.Report.Trace",
+      "exports": [
+        "Trace (..)",
+        "Step (..)",
+        "Origin (..)",
+        "Touch (..)",
+        "Identity (..)",
+        "Failure (..)",
+        "build",
+        "step",
+        "identity",
+        "root"
+      ],
+      "featureIds": [
+        "report_trace"
+      ]
+    },
+    {
+      "module": "Hegel.Report",
+      "exports": [
+        "Report (..)",
+        "Result (..)",
+        "FailureOutcome (..)",
+        "FailureEvidence (..)",
+        "FailureEvidenceStatus (..)",
+        "CleanupDiagnostic (..)",
+        "ReplayReason (..)",
+        "SkipReason (..)",
+        "Abort (..)",
+        "ReplayDivergence (..)",
+        "replayDivergenceReason",
+        "Stats (..)",
+        "pattern RunStats",
+        "pattern ReplayedStats",
+        "ReplayStats (..)",
+        "Reproduction (..)",
+        "aborted",
+        "throwOnFailure",
+        "Note (..)",
+        "NoteKind (..)",
+        "isDrawn",
+        "isFailureNote",
+        "isBranchHeader",
+        "isBranchFailure",
+        "Event (..)",
+        "Operation (..)",
+        "Var (..)",
+        "Tick (..)",
+        "renderReport",
+        "renderReportAnsi",
+        "renderReportRich",
+        "renderReportRichAnsi",
+        "renderReportRichWith",
+        "renderReportRichAnsiWith",
+        "renderReportAuto",
+        "renderFailure",
+        "renderValue",
+        "Ann (..)",
+        "PropertyFailed (..)"
+      ],
+      "featureIds": [
+        "report_evidence"
+      ]
+    },
+    {
+      "module": "Hegel.Runner",
+      "exports": [
+        "check",
+        "checkWithProgress",
+        "replay",
+        "sample",
+        "samples"
+      ],
+      "featureIds": [
+        "sampling",
+        "runner"
+      ]
+    },
+    {
+      "module": "Hegel.Settings",
+      "exports": [
+        "Settings (..)",
+        "defaultSettings",
+        "validate",
+        "SettingsError (..)",
+        "withDatabaseKey"
+      ],
+      "featureIds": [
+        "settings"
+      ]
+    },
+    {
+      "module": "Hegel.Stateful.Concurrent",
+      "exports": [
+        "Rule (..)",
+        "rule",
+        "grouped",
+        "Invariant (..)",
+        "Machine (..)",
+        "anonymousGroup",
+        "internGroups",
+        "Concurrency",
+        "fixed",
+        "upTo",
+        "between",
+        "run"
+      ],
+      "featureIds": [
+        "stateful_concurrent"
+      ]
+    },
+    {
+      "module": "Hegel.Stateful",
+      "exports": [
+        "Rule (..)",
+        "rule",
+        "Invariant (..)",
+        "Machine (..)",
+        "run",
+        "respond",
+        "respondShow"
+      ],
+      "featureIds": [
+        "stateful"
+      ]
+    },
+    {
+      "module": "Hegel.Tasty",
+      "exports": [
+        "testProperty",
+        "testPropertyWith",
+        "testPropertyModify",
+        "HegelTestCases (..)",
+        "HegelStatefulSteps (..)",
+        "HegelSeed (..)",
+        "HegelDatabase (..)",
+        "HegelReplay (..)",
+        "HegelReplayKey (..)"
+      ],
+      "featureIds": [
+        "test_frameworks"
+      ]
+    },
+    {
+      "module": "Hegel.Verbosity",
+      "exports": [
+        "Verbosity (..)"
+      ],
+      "featureIds": [
+        "settings"
+      ]
+    },
+    {
+      "module": "Hegel",
+      "exports": [
+        "Gen",
+        "prop",
+        "forEach",
+        "forEachWith",
+        "registerFinalizer",
+        "resource",
+        "resource_",
+        "replay",
+        "sample",
+        "samples",
+        "Property",
+        "PropertyT",
+        "hoist",
+        "check",
+        "forAll",
+        "forAllWith",
+        "forAllWithLabel",
+        "forAllSilent",
+        "annotate",
+        "annotateShow",
+        "footnote",
+        "assume",
+        "discard",
+        "Fork",
+        "module Hegel.Settings",
+        "module Hegel.Exception",
+        "module Hegel.Backend",
+        "module Hegel.Verbosity",
+        "module Hegel.Database",
+        "module Hegel.HealthCheck",
+        "module Hegel.Report",
+        "module Hegel.Replay",
+        "module Hegel.Phase",
+        "module Hegel.Assertion",
+        "module Hegel.Pool"
+      ],
+      "featureIds": []
+    }
+  ],
+  "compatibilityNotes": [
+    "This is a feature port of the pinned frontend contract to the current pinned native engine, not a port of the Rust engine itself.",
+    "Public names and representations use Lean types; third-party Haskell testing adapters are replaced by Lake integration.",
+    "Calendar times use the native engines nanosecond precision; durations retain arbitrary-precision picoseconds.",
+    "Seeded byte-for-byte agreement between language frontends and hash iteration order is not promised.",
+    "Cancellation is cooperative at Lean draw and IO boundaries; foreign blocking IO cannot be forcibly interrupted."
+  ],
+  "verification": {
+    "frontendVersion": "1.0.0",
+    "leanVersion": "4.34.0",
+    "engineVersion": "0.43.1",
+    "localPlatform": "macOS arm64",
+    "commands": [
+      "lake build hegel_tests hegel_examples hegel_concurrency_tests hegel_panic_probe",
+      "lake test",
+      "python3 scripts/check_ffi.py",
+      "python3 scripts/check_port.py",
+      "python3 scripts/test_safety.py",
+      "python3 scripts/test_concurrency.py",
+      "python3 scripts/test_downstream.py"
+    ],
+    "platformCI": ".github/workflows/ci.yml"
+  }
+}

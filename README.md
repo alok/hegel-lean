@@ -2,32 +2,32 @@
 
 [![CI](https://github.com/alok/hegel-lean/actions/workflows/ci.yml/badge.svg)](https://github.com/alok/hegel-lean/actions/workflows/ci.yml)
 
-A Lean 4 frontend for [Hegel](https://hegel.dev): write generators and properties in Lean,
-then let Hegel generate inputs, shrink failures, and save counterexamples for the next run.
+Write generators, properties, and state machines in Lean. Hegel generates inputs, shrinks
+failures, and saves counterexamples for the next run.
 
 ```lean
 import Hegel
 open Hegel Hegel.Property
 
 def reverseTwice : Property Unit := do
-  let xs ← forAll (Gen.list (Gen.int (-100) 100) 0 40) "xs"
-  assertEq xs.reverse.reverse xs "reverse is involutive"
+  let xs ← forAll! (Gen.list (Gen.int (-100) 100) 0 40)
+  assertEq! xs.reverse.reverse xs
 
 def main : IO Unit := check! "reverse twice" reverseTwice
 ```
 
-The implementation uses the current **native libhegel C API**, with a small C bridge and a
-Lean library. No Haskell, Python testing server, or Rust compiler is needed at runtime.
-The Haskell [zizek](https://github.com/MercuryTechnologies/zizek) client informed the API and
-lifecycle design; this is an independent implementation, not a complete port of zizek.
+The frontend uses native **libhegel 0.43.1** and **Lean 4.34.0**. It includes typed generator
+builders, finite enumeration and filtering, native recursion budgets, source-aware assertions,
+resource management, pools, sequential and concurrent state machines, forks, structured reports,
+and persistent replay. The [port inventory](scripts/port-api.json) maps the reference API's
+feature families to Lean implementations, tests, and explicit language adaptations.
 
 ## Install and run
 
-Requirements: [elan](https://github.com/leanprover/elan), a C compiler, Python 3, and curl.
-On macOS, install the Xcode command-line tools. Lean is pinned to **4.34.0** and libhegel to
-**0.43.1**. The first native build downloads the platform's static engine archive and header
-and verifies their SHA-256 digests against [`engine-lock.json`](engine-lock.json).
-Subsequent builds reuse and recheck those files. Cached builds can run offline.
+Install [elan](https://github.com/leanprover/elan), a C compiler, Python 3, and curl. On macOS,
+install the Xcode command-line tools. No Haskell toolchain, Rust compiler, or testing server is
+needed. The first build downloads the platform's static engine archive and header and checks
+both SHA-256 hashes against [engine-lock.json](engine-lock.json). Cached builds work offline.
 
 ```sh
 git clone https://github.com/alok/hegel-lean.git
@@ -35,26 +35,38 @@ cd hegel-lean
 lake build hegel_tests hegel_examples
 lake test
 lake exe hegel_examples
-lake exe hegel_examples fail  # deliberately exits 1; shrinks n to 5
+lake exe hegel_examples fail  # deliberately fails and shrinks n to 5
 ```
 
-Supported targets are Linux x86-64, Linux ARM64, and Apple Silicon macOS. CI exercises all three.
-Windows and Intel macOS are not yet supported by the build integration.
+The supported platforms are Linux x86-64, Linux ARM64, and Apple Silicon macOS. CI tests all
+three. Windows and Intel macOS are not supported by the build integration.
 
-In another Lake project using the same Lean toolchain, add:
+In another Lake project using the same Lean toolchain:
 
 ```lean
-require «hegel-lean» from git "https://github.com/alok/hegel-lean" @ "main"
+require «hegel-lean» from git "https://github.com/alok/hegel-lean" @ "v1.0.0"
 ```
 
-Run `lake update` once and commit your `lake-manifest.json` to retain the resolved revision.
-The engine is fetched relative to this dependency, and native linking propagates to the
-consumer's executable. [`scripts/test_downstream.py`](scripts/test_downstream.py) tests that path.
-Properties currently run in compiled Lake executables; interactive `#eval` is not supported.
+Run `lake update` and commit `lake-manifest.json` to retain the resolved revision. Engine fetching
+and native linking propagate to the consumer's executable. Properties run in compiled Lake
+executables; the native engine is not loaded into the editor's `#eval` process.
 
 ## Generators
 
-`Gen α` supports `pure`, `<$>`, `<*>`, and `do` notation. Later draws can depend on earlier values:
+`Gen α` supports `pure`, `<$>`, `<*>`, and dependent `do` notation. Public composition records
+shrinking spans. Finite alternatives retain enumeration metadata, allowing `Gen.filtered` and
+`Gen.mapMaybe` to eliminate impossible alternatives before drawing.
+
+| Family | API |
+| --- | --- |
+| Numbers | `Gen.bool`, arbitrary-precision `int` and `nat`, signed and unsigned machine widths, `float`, `float32` |
+| Text and binary | `char`, `text`, `bytes`, `regex`, `email`, `url`, `domain`, `uri`, `uuid` |
+| Alphabets | Unicode categories, explicit inclusion/exclusion, codecs, and named character sets |
+| Collections | Lists, arrays, fixed vectors, nonempty lists, unique collections, ordered and hash maps/sets |
+| Alternatives | Finite choice, weighted choice, options, pairs, static filtering, bounded dynamic filtering |
+| Time | Validated dates, times and datetimes; exact arbitrary-precision picosecond durations |
+| Recursion | Explicit depth-bounded recursion or native shared depth/leaf budgets |
+| Typed builders | `Gen.Builder` constructors with type-directed bounds, sizes, alphabets, and recursion modifiers |
 
 ```lean
 def interval : Gen (Int × Int) := do
@@ -63,132 +75,132 @@ def interval : Gen (Int × Int) := do
   return (lo, hi)
 ```
 
-| API | Values / behavior |
-| --- | --- |
-| `Gen.bool probability` | Boolean, default probability `0.5` |
-| `Gen.int min max`, `Gen.nat min max` | Inclusive, arbitrary-precision bounds |
-| `Gen.fin n positive` | `Fin n` with a checked bound proof |
-| `Gen.float config` | IEEE binary64, configurable bounds, NaN and infinities |
-| `Gen.text config`, `Gen.char` | Unicode scalar values, including embedded NUL |
-| `Gen.bytes minSize maxSize` | `ByteArray` |
-| `Gen.regex pattern fullMatch` | Native engine regex generator |
-| `Gen.email`, `Gen.url`, `Gen.domain maxLength` | Formatted text |
-| `Gen.element values`, `Gen.oneOf choices` | Finite choice; empty input is an error |
-| `Gen.option gen`, `Gen.pair a b` | Optional and paired values |
-| `Gen.list gen min max`, `Gen.array gen min max` | Engine-managed variable-length collections |
-| `Gen.vector gen n` | `Vector α n` with a checked length proof |
-| `Gen.uniqueArray gen min max` | Uniqueness under the element's `BEq` instance |
-| `Gen.filter predicate gen attempts` | Bounded retries, default three; then discard |
-| `Gen.assume condition`, `Gen.discard` | Reject a case without reporting a failure |
-| `Gen.recursive depth leaf branch` | Explicit depth-bounded recursion |
-| `Gen.defer (fun () => gen)` | Delay generator construction |
+`Gen.fin` and `Gen.vector` return values with checked bound and length proofs. Functions can also
+be generated by mapping ordinary values to closures; use `draw` when the result lacks `Repr`.
+Finite enumeration is optional metadata, not a promise to enumerate infinite domains.
 
-Collection and text sizes default to `0..64`. Integer bounds are required; they never silently
-wrap at 64 bits. Negative and positive integers beyond 200 bits are covered by integration tests.
-Lists use Hegel's collection primitive so the engine controls both their lengths and shrinking.
-Recursive generation uses a caller-supplied maximum depth, not Hegel's native recursion-budget API.
+Direct low-level generators preserve their existing error API. Invalid configurations in the
+new builders and higher-level generators produce stable, shrinkable validation failures.
+Engine invariants and native-handle errors abort the campaign. See [generator details](docs/generators.md).
 
-Functions can be ordinary generated values. Use `Property.draw` when a value has no `Repr` instance:
+## Properties and replay
 
-```lean
-def shifted : Property Unit := do
-  let f ← draw ((fun n x => x + n) <$> Gen.nat 0 100)
-  assertEq (f 10 - f 0) 10 "shift preserves difference"
-```
-
-## Properties, reports, and replay
-
-`Property.forAll` records a generated value in the final failure report. `draw` omits the
-representation; `annotate` adds text. Assertions take a **stable origin string**: use a unique
-name for each assertion, without generated values. Hegel groups and shrinks failures by this
-origin. Put variable details in the optional message or annotations.
+`forAll!` records generated values, while `draw` omits their representation. `assert!`,
+`assertEq!`, `assertNe!`, `assertProp!`, and `failure!` capture source locations. Their failure
+origins include the Lean module and source position, avoiding absolute checkout paths in replay
+identities. Explicit-origin `assertThat`, `assertEq`, `assertNe`, and `assertProp` remain available.
 
 ```lean
 def bounded : Property Unit := do
-  let n ← forAll (Gen.int 0 100) "n"
-  assertThat (n < 5) "bounded/n-less-than-five" s!"Found {n}"
+  let n ← forAll! (Gen.int 0 100)
+  assert! (n < 5) because "expected a small number"
 
 def inspect : IO Unit := do
   let report ← check "bounded" bounded { seed := some 42, database := none }
-  IO.println report.render
+  IO.println (← report.renderRich)
   for failure in report.failures do
-    let repeated ← replay failure.blob bounded
-    IO.println (reprStr repeated)
+    if !failure.blob.isEmpty then
+      IO.println (reprStr (← replay failure.blob bounded))
 ```
 
-This property fails and shrinks to `n = 5`. A property requiring list length below three
-shrinks to `[0, 0, 0]`. Both exact results and replayed annotations are regression-tested.
-Replay blobs are guaranteed only with the same engine version and compatible property code.
+This property shrinks to `n = 5`. Blobs require the same engine version and compatible property
+code. Changing an assertion's location or the order of draws can invalidate earlier replay.
 
-- `check` returns a structured `Report`; outcomes distinguish pass, failure, engine/health-check
-  error, and nondeterministic failure. Reports include final replayed values and replay blobs.
-- `check!` prints the report and throws an IO error for every non-passing outcome.
-- `runTests` runs an array of named `Test` values and returns process exit code `0` or `1`.
-- `assertProp p origin` tests a decidable Lean proposition. It does not prove it universally.
-- `assume false` rejects a case. Excessive rejection triggers Hegel's health checks and cannot
-  silently become a passing run.
-- `Property.io action origin` runs IO on every execution, including shrinking and replay;
-  IO exceptions become failures. Reset mutable state within each case and keep the property
-  deterministic for the same draws.
-- `target score label` guides Hegel toward larger finite scores.
+- `check` returns a `Report` distinguishing passing, failing, engine/error, and nondeterministic
+  outcomes. Evidence distinguishes reconstructed counterexamples from observations without replay.
+- `check!` prints the report and raises an IO error for every non-passing outcome. `runTests`
+  returns a process exit code and fits a Lake test driver.
+- Campaigns with no valid examples cannot pass, including when rejection health checks are
+  suppressed or the selected phases execute nothing.
+- `resource acquire release` and `registerFinalizer` release per-case resources in reverse order
+  after workers settle. Every cleanup is attempted. Cleanup errors retain the original evidence
+  and stop the campaign before further execution.
+- `annotate`, `footnote`, structural diffs, source excerpts, pool lineage, and worker/round notes
+  support plain, styled, ASCII, and Unicode reporting.
+- `Property.io` runs effects on each execution, including shrinking and replay. Reset mutable
+  state in case setup. `target` guides generation toward larger finite scores.
+- `sample` draws exactly one case and raises an error if it rejects. `samples` collects from
+  one generation-only campaign; finite-space exhaustion can return fewer values than requested.
 
-The default database is `.hegel/examples`, keyed by the name passed to `check`. Use stable,
-distinct test names. Set `database := none` for ephemeral tests. `Settings` also controls the
-example count, optional seed, phases, multiple-failure reporting, and health-check suppression.
-`Report.evaluations` counts body executions during the campaign, **including shrinking**;
-it excludes the extra final replay used to collect annotations.
+The default database is `.hegel/examples`, keyed by a stable test name. Set `database := none`
+for ephemeral tests. `Settings` also controls phases, seed/derandomization, backend, verbosity,
+stateful step count, clone depth, health checks, multiple failures, and engine output.
+`Report.evaluations` includes shrinking executions and excludes final evidence reconstruction.
 
-## Verification and trust boundary
+## Stateful and concurrent properties
 
-`lake test` runs against the real pinned engine. It covers primitive bounds, arbitrary-size
-integers, dependent draws, Unicode/NUL preservation, nested collections, recursive trees,
-functions, minimal counterexamples, multiple failure origins, exact replay, persistence,
-invalid configurations, IO errors, health checks, and native-handle lifecycle checks.
+`Stateful.Machine` combines initial state, weighted rules, and invariants. The native engine
+selects rules, rejects unavailable actions, and shrinks action sequences. `Pool α` tracks values
+that rules create, reuse, consume, and transfer, with their lineage retained in reports.
+
+`Stateful.Concurrent` adds concurrency bounds and rule groups. Dedicated OS threads retain one
+cloned engine stream per worker across rounds. A round joins before root-thread invariants run;
+rules in different groups do not overlap.
+
+`Property.Branch` offers pairs, mapping, replication, and bounded fan-out. Results retain input
+order and every branch settles before a failure returns. `Property.Fork` offers `spawn`, `join`,
+`poll`, `cancel`, and `scoped`. Polling does not discharge a fork's join-or-cancel obligation;
+an abandoned fork is a malformed test.
+
+Choice streams can replay; real-time thread interleavings cannot be guaranteed to replay. When
+the engine reports a nondeterministic failure without a blob, the observed journal is retained.
+Cancellation uses Lean's cooperative task cancellation at draw and `Property.io` boundaries.
+A worker blocked forever inside foreign IO cannot be forcibly interrupted by Lean. Shared state
+must use suitable synchronization, and clone creation must occur in a consistent order.
+
+## Verification
+
+See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
+
+`lake test` executes the real pinned engine. Tests cover bounds, enumeration, native recursion,
+shrinking minima, exact replay, persistence, source identities, cleanup, pool lifecycle,
+sequential schedules, concurrent overlap, worker groups, and error propagation.
 
 ```sh
-python3 scripts/check_ffi.py       # C signatures checked against Lean-emitted prototypes
-python3 scripts/test_downstream.py # build and run a separate Lake consumer
+python3 scripts/check_ffi.py        # compile against every Lean-emitted native prototype
+python3 scripts/test_safety.py      # unchecked Lean panic must fail in a subprocess
+python3 scripts/test_downstream.py  # build and execute a separate Lake consumer
 ```
 
-The bridge owns and releases contexts, settings, runs, test cases, collections, result snapshots,
-and returned buffers. Explicit close is idempotent; an external-object finalizer is a fallback.
-Sessions reject access from a different OS thread and use after close. Independent campaigns can
-run on separate threads, but a single property cannot perform generator draws on worker threads.
+[David R. MacIver blog regressions](docs/maciver-tests.md) include 13 scenarios across three seeds,
+the 70-copies-of-10 stress case, dependent generators, Unicode, and distinct NaN/empty-list
+failures. Two discovery probes retain observed coverage misses rather than treating them as
+proofs of coverage. CI uploads machine-readable receipts. Run `lake exe hegel_maciver_tests`
+for this suite alone.
 
-Lean checks the frontend's types and the proof fields in `Fin` and `Vector`. This is **not a
-formal verification of Hegel or the C bridge**. The engine, compiler/runtime, native ABI, and C
-ownership code remain trusted. There are no `sorry` proofs or user-defined logical axioms.
+The native bridge checks thread ownership, case-family identity, closed handles, and string
+lengths, including embedded NULs. Each native allocation has an explicit matching release;
+external-object finalizers provide fallback cleanup.
 
-`lake test` also includes [regressions derived from David R. MacIver's blog](docs/maciver-tests.md):
-13 scenarios across three seeds, including the 70-copies-of-10 stress case, dependent generators,
-Unicode, and distinct NaN/empty-list failures. Two additional discovery probes preserve observed
-coverage misses in the output. Run `lake exe hegel_maciver_tests` for just this suite. CI uploads
-machine-readable results for every supported platform.
+Lean checks frontend types and proof fields. This is **not a formal verification of the engine
+or C bridge**. Native code, the compiler/runtime, and the ABI remain trusted. Starting a campaign
+enables Lean's process-wide fatal-panic policy: an unchecked `panic!` or out-of-bounds `get!`
+terminates the executable with failure rather than supplying a default value and reporting a
+false pass. Ordinary property assertion failures still shrink and replay.
 
-The public API intentionally covers single-threaded properties and compositional generators.
-Native concurrent state machines, pools, calendar/UUID generators, source-location macros,
-and pretty-printer bindings are not implemented. No claim of full zizek API parity is made.
+## Maintenance
 
-## Maintenance and sources
-
-CI runs on pushes, pull requests, manual dispatch, and weekly. To update the engine pin:
+CI runs on pushes, pull requests, manual dispatch, and weekly. Engine updates are deliberate:
 
 ```sh
 python3 scripts/update_engine.py
 lake build hegel_tests hegel_examples
 lake test
 python3 scripts/check_ffi.py
+python3 scripts/test_safety.py
 python3 scripts/test_downstream.py
 ```
 
-Review upstream changes, refresh the version notes and compatibility documentation, and commit
-only after checks pass. An engine release tag, source commit, artifact URLs, and SHA-256 hashes
-are kept in `engine-lock.json`. Builds never silently follow upstream `main`.
+Review upstream changes and all platform results before accepting a new pin. Engine source,
+release tag, artifact URLs, and hashes are recorded in `engine-lock.json`; builds never silently
+follow upstream `main`. The current [engine source](https://github.com/hegeldev/hegel-rust/tree/9a130bfde99005504b0004428e047803ac18d3a0/hegel-c)
+is pinned for inspection.
 
-- Engine/C ABI: [hegel-rust at 9a130bf](https://github.com/hegeldev/hegel-rust/tree/9a130bfde99005504b0004428e047803ac18d3a0/hegel-c)
-- Haskell design reference: [zizek at 6b25365](https://github.com/MercuryTechnologies/zizek/tree/6b25365f6c6e2d9bbe6970a3eb892ba4c076e241/library/Hegel)
-- The archived [hegel-core](https://github.com/hegeldev/hegel-core) subprocess implementation is
-  not a dependency; its README directs users to the native API.
+MIT licensed. See [LICENSE](LICENSE) and the engine's [license](vendor/HEGEL-LICENSE).
+This is an independent frontend.
 
-MIT licensed. See [LICENSE](LICENSE) and the upstream engine's [license](vendor/HEGEL-LICENSE).
-This is an independent frontend, not an official Hegel or Mercury Technologies release.
+## Acknowledgments
+
+The API and behavioral contracts were informed by Mercury Technologies' Haskell
+[zizek client at 6b25365](https://github.com/MercuryTechnologies/zizek/tree/6b25365f6c6e2d9bbe6970a3eb892ba4c076e241),
+and the regression scenarios by David R. MacIver's writing on property-based testing.

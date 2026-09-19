@@ -1,6 +1,6 @@
 /* Lean object ownership follows lean/lean.h; engine ownership follows hegel.h. */
-#include <lean/lean.h>
-#include <hegel.h>
+#include "hegel_lean.h"
+#include <stdatomic.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +12,27 @@ typedef struct collection_entry {
     struct collection_entry *next;
 } collection_entry;
 
-typedef struct {
+typedef struct resource_entry {
+    uint64_t id;
+    void *value;
+    void (*release)(hegel_context_t *, void *);
+    struct resource_entry *next;
+} resource_entry;
+typedef struct pool_event {
+    uint64_t fields[5];
+    struct pool_event *next;
+} pool_event;
+typedef struct family_state {
+    atomic_uint refs;
+    atomic_uint_fast64_t next_pool;
+} family_state;
+typedef struct output_state {
+    atomic_uint refs;
+    pthread_mutex_t lock;
+    char *data;
+    size_t len;
+} output_state;
+struct hegel_lean_session {
     hegel_context_t *ctx;
     hegel_settings_t *settings;
     hegel_run_t *run;
@@ -20,7 +40,15 @@ typedef struct {
     collection_entry *collections;
     uint64_t next_id;
     pthread_t owner;
-} session;
+    atomic_int owner_state;
+    uint64_t family;
+    bool is_clone;
+    family_state *shared_family;
+    output_state *output;
+    resource_entry *resources;
+    pool_event *events_head, *events_tail;
+};
+static atomic_uint_fast64_t next_family = 1;
 
 static lean_object *error_value(int code, const char *message) {
     lean_object *e = lean_alloc_ctor(0, 2, 0);
@@ -42,8 +70,21 @@ static void release_collections(session *s) {
 }
 static void release_case(session *s) {
     release_collections(s);
+    while (s->resources) {
+        resource_entry *entry = s->resources;
+        s->resources = entry->next;
+        entry->release(s->ctx, entry->value); free(entry);
+    }
+    while (s->events_head) {
+        pool_event *entry = s->events_head;
+        s->events_head = entry->next; free(entry);
+    }
+    s->events_tail = NULL;
     if (s->tc) hegel_test_case_free(s->ctx, s->tc);
     s->tc = NULL;
+    if (s->shared_family && atomic_fetch_sub(&s->shared_family->refs, 1) == 1)
+        free(s->shared_family);
+    s->shared_family = NULL;
 }
 static void release_session(session *s) {
     if (!s->ctx) return;
@@ -52,6 +93,10 @@ static void release_session(session *s) {
     if (s->settings) hegel_settings_free(s->ctx, s->settings);
     hegel_context_free(s->ctx);
     s->ctx = NULL; s->run = NULL; s->settings = NULL;
+    if (s->output && atomic_fetch_sub(&s->output->refs, 1) == 1) {
+        pthread_mutex_destroy(&s->output->lock); free(s->output->data); free(s->output);
+    }
+    s->output = NULL;
 }
 static void finalize(void *data) { session *s = data; release_session(s); free(s); }
 static void foreach_ref(void *data, b_lean_obj_arg f) { (void)data; (void)f; }
@@ -60,12 +105,36 @@ static pthread_once_t class_once = PTHREAD_ONCE_INIT;
 static void init_class(void) {
     session_class = lean_register_external_class(finalize, foreach_ref);
 }
-/* Sessions are confined to their creating OS thread. Reject before touching ctx. */
+/* A cloned stream is claimed by its first worker, then stays thread confined. */
+session *hegel_lean_get_session(b_lean_obj_arg handle) { return lean_get_external_data(handle); }
+lean_object *hegel_lean_check_session(session *s, bool require_case) {
+    int state = atomic_load_explicit(&s->owner_state, memory_order_acquire);
+    if (state == 0) {
+        int expected = 0;
+        if (!atomic_compare_exchange_strong(&s->owner_state, &expected, 2))
+            return error_value(HEGEL_E_CONCURRENT_USE, "Hegel stream is being claimed");
+        s->owner = pthread_self();
+        atomic_store_explicit(&s->owner_state, 1, memory_order_release);
+    } else if (state != 1 || !pthread_equal(s->owner, pthread_self())) {
+        return error_value(HEGEL_E_CONCURRENT_USE, "Hegel session used from another thread");
+    }
+    if (!s->ctx) return error_value(HEGEL_E_INVALID_HANDLE, "Hegel session is closed");
+    if (require_case && !s->tc)
+        return error_value(HEGEL_E_INVALID_HANDLE, "No active Hegel test case");
+    return NULL;
+}
+hegel_context_t *hegel_lean_context(session *s) { return s->ctx; }
+hegel_settings_t *hegel_lean_settings(session *s) { return s->settings; }
+hegel_test_case_t *hegel_lean_test_case(session *s) { return s->tc; }
+uint64_t hegel_lean_family(session *s) { return s->family; }
+lean_object *hegel_lean_error(int code, const char *msg) { return error_value(code, msg); }
+lean_object *hegel_lean_error_value(int code, const char *msg) { return error_value(code, msg); }
+lean_object *hegel_lean_engine_error(session *s, hegel_result_t rc) { return engine_error(s, rc); }
+lean_object *hegel_lean_unit_ok(void) { return unit_ok(); }
 #define SESSION() \
-    session *s = lean_get_external_data(handle); \
-    if (!pthread_equal(s->owner, pthread_self())) \
-        return error_value(HEGEL_E_CONCURRENT_USE, "Hegel session used from another thread"); \
-    if (!s->ctx) return error_value(HEGEL_E_INVALID_HANDLE, "Hegel session is closed")
+    session *s = hegel_lean_get_session(handle); \
+    lean_object *session_error = hegel_lean_check_session(s, false); \
+    if (session_error) return session_error
 #define CASE() SESSION(); \
     if (!s->tc) return error_value(HEGEL_E_INVALID_HANDLE, "No active Hegel test case")
 #define CHECK(expr) do { hegel_result_t rc_ = (expr); \
@@ -75,7 +144,15 @@ static void init_class(void) {
         return error_value(HEGEL_E_INVALID_ARG, "Embedded NUL in C-string argument"); \
 } while (0)
 static void silent_output(void *data, const char *line, size_t len) {
-    (void)data; (void)line; (void)len;
+    output_state *output = data;
+    if (!output) return;
+    pthread_mutex_lock(&output->lock);
+    char *buffer = realloc(output->data, output->len + len + 2);
+    if (!buffer) lean_internal_panic_out_of_memory();
+    output->data = buffer;
+    memcpy(buffer + output->len, line, len); output->len += len;
+    buffer[output->len++] = '\n'; buffer[output->len] = 0;
+    pthread_mutex_unlock(&output->lock);
 }
 
 LEAN_EXPORT lean_obj_res lean_hegel_open(uint64_t cases, uint64_t seed, uint8_t has_seed,
@@ -85,6 +162,10 @@ LEAN_EXPORT lean_obj_res lean_hegel_open(uint64_t cases, uint64_t seed, uint8_t 
     session *s = calloc(1, sizeof(session));
     if (!s) return error_value(HEGEL_E_INTERNAL, "Could not allocate Hegel session");
     s->ctx = hegel_context_new(); s->owner = pthread_self();
+    atomic_init(&s->owner_state, 1);
+    s->output = calloc(1, sizeof(output_state));
+    if (!s->output) lean_internal_panic_out_of_memory();
+    atomic_init(&s->output->refs, 1); pthread_mutex_init(&s->output->lock, NULL);
     hegel_result_t rc;
 #define SET(expr) do { rc = (expr); if (rc != HEGEL_OK) goto fail; } while (0)
     SET(hegel_settings_new(s->ctx, &s->settings));
@@ -97,7 +178,7 @@ LEAN_EXPORT lean_obj_res lean_hegel_open(uint64_t cases, uint64_t seed, uint8_t 
     SET(hegel_settings_set_phases(s->ctx, s->settings, phases));
     SET(hegel_settings_set_suppress_health_check(s->ctx, s->settings, suppress));
     SET(hegel_settings_set_verbosity(s->ctx, s->settings, HEGEL_VERBOSITY_QUIET));
-    SET(hegel_run_start(s->ctx, s->settings, silent_output, NULL, &s->run));
+    /* Settings.configure runs before the explicit startRun call. */
     pthread_once(&class_once, init_class);
     return lean_io_result_mk_ok(lean_alloc_external(session_class, s));
 fail: {
@@ -108,8 +189,9 @@ fail: {
 }
 LEAN_EXPORT lean_obj_res lean_hegel_close(b_lean_obj_arg handle) {
     session *s = lean_get_external_data(handle);
-    if (!pthread_equal(s->owner, pthread_self()))
-        return error_value(HEGEL_E_CONCURRENT_USE, "Hegel session used from another thread");
+    if (!s->ctx) return unit_ok();
+    lean_object *err = hegel_lean_check_session(s, false);
+    if (err) return err;
     release_session(s); return unit_ok();
 }
 LEAN_EXPORT lean_obj_res lean_hegel_next(b_lean_obj_arg handle) {
@@ -118,11 +200,18 @@ LEAN_EXPORT lean_obj_res lean_hegel_next(b_lean_obj_arg handle) {
     hegel_test_case_t *tc = NULL;
     CHECK(hegel_next_test_case(s->ctx, s->run, &tc));
     release_case(s); s->tc = tc;
+    if (tc) {
+        s->family = atomic_fetch_add(&next_family, 1);
+        s->shared_family = calloc(1, sizeof(family_state));
+        if (!s->shared_family) lean_internal_panic_out_of_memory();
+        atomic_init(&s->shared_family->refs, 1); atomic_init(&s->shared_family->next_pool, 0);
+    }
     return lean_io_result_mk_ok(lean_box(tc != NULL));
 }
 LEAN_EXPORT lean_obj_res lean_hegel_complete(b_lean_obj_arg handle, uint32_t status,
     b_lean_obj_arg origin) {
     CASE(); CSTRING(origin);
+    if (s->is_clone) return error_value(HEGEL_E_INVALID_ARG, "Only the root completes a case");
     CHECK(hegel_mark_complete(s->ctx, s->tc, status,
           status == HEGEL_STATUS_INTERESTING ? lean_string_cstr(origin) : NULL));
     release_case(s); return unit_ok();
@@ -131,7 +220,11 @@ LEAN_EXPORT lean_obj_res lean_hegel_replay(b_lean_obj_arg handle, b_lean_obj_arg
     SESSION(); CSTRING(blob);
     if (s->tc) return error_value(HEGEL_E_NOT_COMPLETE, "Complete the current case before replay");
     CHECK(hegel_test_case_from_blob(s->ctx, s->settings, lean_string_cstr(blob),
-                                  silent_output, NULL, &s->tc));
+                                  silent_output, s->output, &s->tc));
+    s->family = atomic_fetch_add(&next_family, 1);
+    s->shared_family = calloc(1, sizeof(family_state));
+    if (!s->shared_family) lean_internal_panic_out_of_memory();
+    atomic_init(&s->shared_family->refs, 1); atomic_init(&s->shared_family->next_pool, 0);
     return unit_ok();
 }
 LEAN_EXPORT lean_obj_res lean_hegel_result(b_lean_obj_arg handle) {
@@ -293,4 +386,92 @@ LEAN_EXPORT lean_obj_res lean_hegel_target(b_lean_obj_arg handle, double score,
     b_lean_obj_arg label) {
     CASE(); CSTRING(label);
     CHECK(hegel_target(s->ctx, s->tc, score, lean_string_cstr(label))); return unit_ok();
+}
+
+static pthread_once_t strict_panic_once = PTHREAD_ONCE_INIT;
+static void enable_strict_panics(void) { lean_set_exit_on_panic(true); }
+LEAN_EXPORT lean_obj_res lean_hegel_start_run(b_lean_obj_arg handle) {
+    SESSION();
+    if (s->run || !s->settings)
+        return error_value(HEGEL_E_INVALID_ARG, "Run already started or cloned stream");
+    pthread_once(&strict_panic_once, enable_strict_panics);
+    CHECK(hegel_run_start(s->ctx, s->settings, silent_output, s->output, &s->run));
+    return unit_ok();
+}
+LEAN_EXPORT lean_obj_res lean_hegel_clone(b_lean_obj_arg handle) {
+    CASE();
+    session *child = calloc(1, sizeof(session));
+    if (!child) return error_value(HEGEL_E_INTERNAL, "Could not allocate cloned stream");
+    child->ctx = hegel_context_new();
+    child->family = s->family;
+    child->shared_family = s->shared_family;
+    atomic_fetch_add(&child->shared_family->refs, 1);
+    child->output = s->output;
+    atomic_fetch_add(&child->output->refs, 1);
+    child->is_clone = true;
+    atomic_init(&child->owner_state, 0);
+    hegel_result_t rc = hegel_test_case_clone(s->ctx, s->tc, &child->tc);
+    if (rc != HEGEL_OK) {
+        lean_object *err = engine_error(s, rc);
+        release_session(child); free(child); return err;
+    }
+    return lean_io_result_mk_ok(lean_alloc_external(session_class, child));
+}
+
+uint64_t hegel_lean_register_resource(session *s, void *resource,
+    void (*release)(hegel_context_t *, void *)) {
+    resource_entry *entry = malloc(sizeof(resource_entry));
+    if (!entry) return 0;
+    entry->id = ++s->next_id; entry->value = resource; entry->release = release;
+    entry->next = s->resources; s->resources = entry;
+    return entry->id;
+}
+void *hegel_lean_get_resource(session *s, uint64_t id) {
+    for (resource_entry *entry = s->resources; entry; entry = entry->next)
+        if (entry->id == id) return entry->value;
+    return NULL;
+}
+hegel_result_t hegel_lean_free_resource(session *s, uint64_t id) {
+    resource_entry **link = &s->resources;
+    while (*link) {
+        resource_entry *entry = *link;
+        if (entry->id == id) {
+            *link = entry->next;
+            entry->release(s->ctx, entry->value); free(entry); return HEGEL_OK;
+        }
+        link = &entry->next;
+    }
+    return HEGEL_E_INVALID_HANDLE;
+}
+void hegel_lean_record_pool_event(session *s, uint32_t kind, uint64_t pool, uint64_t index,
+    uint64_t source_pool, uint64_t source_index) {
+    pool_event *entry = malloc(sizeof(pool_event));
+    if (!entry) lean_internal_panic_out_of_memory();
+    entry->fields[0] = kind; entry->fields[1] = pool; entry->fields[2] = index;
+    entry->fields[3] = source_pool; entry->fields[4] = source_index; entry->next = NULL;
+    if (s->events_tail) s->events_tail->next = entry; else s->events_head = entry;
+    s->events_tail = entry;
+}
+LEAN_EXPORT lean_obj_res lean_hegel_drain_pool_events(b_lean_obj_arg handle) {
+    SESSION();
+    lean_object *out = lean_mk_empty_array();
+    while (s->events_head) {
+        pool_event *entry = s->events_head; s->events_head = entry->next;
+        lean_object *event = lean_alloc_ctor(0, 5, 0);
+        for (size_t i = 0; i < 5; ++i) lean_ctor_set(event, i, lean_uint64_to_nat(entry->fields[i]));
+        out = lean_array_push(out, event); free(entry);
+    }
+    s->events_tail = NULL;
+    return lean_io_result_mk_ok(out);
+}
+
+uint64_t hegel_lean_fresh_pool_id(session *s) {
+    return atomic_fetch_add(&s->shared_family->next_pool, 1);
+}
+LEAN_EXPORT lean_obj_res lean_hegel_output(b_lean_obj_arg handle) {
+    SESSION();
+    pthread_mutex_lock(&s->output->lock);
+    lean_object *out = lean_mk_string_from_bytes(s->output->data ? s->output->data : "", s->output->len);
+    pthread_mutex_unlock(&s->output->lock);
+    return lean_io_result_mk_ok(out);
 }

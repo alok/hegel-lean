@@ -23,11 +23,17 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Build
-        run: lake build hegel_tests hegel_examples hegel_maciver_tests
+        run: lake build hegel_tests hegel_examples hegel_maciver_tests hegel_panic_probe hegel_concurrency_tests
       - name: Check native ABI
         run: python3 scripts/check_ffi.py
+      - name: Check port inventory
+        run: python3 scripts/check_port.py
       - name: Integration tests
         run: lake test
+      - name: Panic safety regression
+        run: python3 scripts/test_safety.py
+      - name: Concurrency watchdog
+        run: python3 scripts/test_concurrency.py
       - name: Preserve MacIver test results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

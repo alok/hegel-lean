@@ -1,3 +1,10 @@
 import Hegel.Gen
 import Hegel.Property
 import Hegel.Runner
+import Hegel.Gen.Recursive
+import Hegel.Assertion
+import Hegel.Collection
+import Hegel.Pool
+import Hegel.Stateful.Concurrent
+import Hegel.Property.Fork
+import Hegel.Replay

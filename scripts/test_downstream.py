@@ -21,7 +21,14 @@ lean_exe consumer where
 open Hegel Hegel.Property
 def main : IO Unit := check! "consumer" (do
   let n ← forAll (Gen.int 0 100)
-  assertProp (n ≥ 0) "nonnegative") { database := none }
+  assertProp! (n ≥ 0)
+  let pool ← Pool.named "consumer values"
+  pool.add n
+  assertEq! (← draw pool.reuse) n
+  let date ← draw (Gen.date ⟨2024, 2, 29⟩ ⟨2024, 2, 29⟩)
+  assert! date.valid
+  let pair ← Property.Branch.concurrently (pure (1 : Nat)) (pure (2 : Nat))
+  assertEq! pair (1, 2)) { database := none, maxExamples := 10 }
 ''')
     subprocess.run(['lake', 'build'], cwd=dest, check=True)
     subprocess.run(['lake', 'exe', 'consumer'], cwd=dest, check=True)

@@ -1,6 +1,12 @@
 import Hegel
 import Lean.Data.Json
 import Tests.MacIver
+import Tests.Generators
+import Tests.Reporting
+import Tests.Stateful
+import Tests.Safety
+import Tests.Concurrency
+import Tests.Replay
 
 open Hegel Hegel.Property
 
@@ -147,6 +153,7 @@ def main : IO Unit := do
   require (match malformed with | .error _ => true | .ok _ => false) "Invalid replay blob accepted"
   let session ← (Internal.openSession 10 42 true "" "lifecycle" false 30 0).toIO
     (IO.userError ∘ toString)
+  (Internal.startRun session).toIO (IO.userError ∘ toString)
   let worker ← (Internal.next session).asTask
   require (match worker.get with | .error e => e.code == -9 | _ => false)
     "Cross-thread session access was not rejected"
@@ -159,3 +166,9 @@ def main : IO Unit := do
   IO.println "All Hegel integration tests passed."
   let receipts ← Tests.MacIver.run
   Tests.MacIver.writeReceipts ".lake/maciver-results.json" receipts
+  Tests.Generators.run
+  Tests.Reporting.run
+  Tests.Stateful.run
+  Tests.Safety.run
+  Tests.Concurrency.run
+  Tests.Replay.run

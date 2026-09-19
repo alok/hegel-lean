@@ -10,20 +10,114 @@ inductive Abort where
   | overrun
   | failure (origin message : String)
   | error (message : String)
+  | recursionLeafRetry
+  | recursionMispriced
   deriving Repr
 
-/-- A generator may depend on earlier draws and can reject the current case. -/
-abbrev Gen := ReaderT Session.type (EIO Abort)
+/-- A generator retains a lazy finite enumeration alongside its native execution. -/
+structure Gen (α : Type) where
+  run : Session.type → EIO Abort α
+  finiteValues : Unit → Option (List α) := fun _ ↦ none
+  /-- Applicative spines execute without nested tuple wrappers. -/
+  runSpine : Session.type → EIO Abort α := run
+  apLeaves : Nat := 1
+
+instance : CoeFun (Gen α) (fun _ ↦ Session.type → EIO Abort α) := ⟨Gen.run⟩
 
 namespace Gen
 
-def native (f : Session.type → EIO EngineError α) : Gen α := fun s =>
-  (f s).adapt fun e =>
+def ofRun (run : Session.type → EIO Abort α) : Gen α := ⟨run, fun _ ↦ none, run, 1⟩
+
+def enumerate (gen : Gen α) : Option (List α) := gen.finiteValues ()
+
+def withEnumeration (values : Unit → Option (List α)) (gen : Gen α) : Gen α :=
+  { gen with finiteValues := values }
+
+private def engine (action : EIO EngineError α) : EIO Abort α :=
+  action.adapt fun e ↦
     if e.code == -1 then .overrun
     else if e.code == -2 then .discard
     else .error (toString e)
 
+/-- Restore a span on local exceptions; recursive retry signals belong to the native engine. -/
+private def runInSpan (session : Session.type) (label : String) (action : EIO Abort α) :
+    EIO Abort α := do
+  engine (startSpan session label)
+  let result ← action.toBaseIO
+  match result with
+  | .ok value =>
+    engine (stopSpan session false)
+    return value
+  | .error e =>
+    match e with
+    | .recursionLeafRetry | .recursionMispriced => pure ()
+    | _ =>
+      -- Preserve the original error if the engine has already frozen the case.
+      let _ ← (stopSpan session true).toBaseIO
+      pure ()
+    throw e
+
+instance : Monad Gen where
+  pure value := { run := fun _ ↦ pure value, finiteValues := fun _ ↦ some [value], apLeaves := 0 }
+  bind gen f := ofRun fun session ↦ runInSpan session "lean.flatMap" do
+    let value ← gen session
+    (f value) session
+  map f gen := {
+    run := fun session ↦ runInSpan session "lean.mapped" (f <$> gen session)
+    finiteValues := fun _ ↦ (enumerate gen).map (List.map f)
+    apLeaves := gen.apLeaves
+  }
+  seq gf ga :=
+    let spine := fun session ↦ do
+      let f ← gf.runSpine session
+      let value ← (ga ()) session
+      return f value
+    { run := fun session ↦
+        if gf.apLeaves + (ga ()).apLeaves < 2 then spine session
+        else runInSpan session "lean.tuple" (spine session)
+      runSpine := spine
+      finiteValues := fun _ ↦ do
+        let fs ← enumerate gf
+        let xs ← enumerate (ga ())
+        return fs.flatMap fun f ↦ xs.map f
+      apLeaves := gf.apLeaves + (ga ()).apLeaves }
+
+instance : MonadExceptOf Abort Gen where
+  throw e := ofRun fun _ ↦ throw e
+  tryCatch gen handler := ofRun fun session ↦ try gen session catch e => handler e session
+
+instance : MonadLiftT BaseIO Gen where
+  monadLift action := ofRun fun _ ↦ action
+
+instance : MonadFinally Gen where
+  tryFinally' action finalizer := ofRun fun session ↦ do
+    let result ← (action session).toBaseIO
+    let after ← (finalizer result.toOption session).toBaseIO
+    match result, after with
+    | .error e, _ => throw e
+    | .ok _, .error e => throw e
+    | .ok value, .ok value' => return (value, value')
+
+def native (f : Session.type → EIO EngineError α) : Gen α := ofRun fun s ↦ do
+  if ← IO.checkCanceled then throw (.error "Property cancelled")
+  engine (f s)
+
 def invalid (message : String) : Gen α := throw (.error message)
+
+/-- Invalid builder configuration is a counterexample with a stable generator-specific origin. -/
+def validation (origin message : String) : Gen α :=
+  throw (.failure ("generator/" ++ origin) message)
+
+/-- Native invalid-argument responses are configuration failures for typed generator builders. -/
+def nativeValidation (origin : String) (f : Session.type → EIO EngineError α) : Gen α :=
+  ofRun fun s => do
+    if ← IO.checkCanceled then throw (.error "Property cancelled")
+    (f s).adapt fun e =>
+    if e.code == -5 then .failure ("generator/" ++ origin) e.message
+    else if e.code == -1 then .overrun
+    else if e.code == -2 then .discard
+    else .error (toString e)
+
 
 /-- Discard the current case without reporting a counterexample. -/
 def assume (condition : Bool) : Gen Unit :=
@@ -32,14 +126,12 @@ def assume (condition : Bool) : Gen Unit :=
 def discard : Gen α := throw .discard
 
 /-- Group draws into a unit that the engine can shrink together. -/
-def withSpan (label : String) (gen : Gen α) : Gen α := do
-  native (startSpan · label)
-  let value ← gen
-  native (stopSpan · false)
-  return value
+def withSpan (label : String) (gen : Gen α) : Gen α :=
+  let run := fun session ↦ runInSpan session label (gen session)
+  { gen with run, runSpine := run }
 
 /-- Delay construction, useful on recursive edges in a strict language. -/
-def defer (f : Unit → Gen α) : Gen α := fun s => f () s
+def defer (f : Unit → Gen α) : Gen α := ofRun fun s ↦ f () s
 
 def bool (probability : Float := 0.5) : Gen Bool := native (boolean · probability)
 
@@ -124,13 +216,18 @@ def domain (maxLength : UInt64 := 255) : Gen String :=
   native (Internal.string · 3 "" false maxLength)
 
 /-- Choose from a finite array. An empty array is a configuration error. -/
-def element (values : Array α) : Gen α := withSpan "lean.element" do
+def element (values : Array α) : Gen α :=
+  withEnumeration (fun _ ↦ if values.isEmpty then none else some values.toList) <|
+  withSpan "lean.element" do
   if h : 0 < values.size then
     let i ← fin values.size h
     return values[i]
   else invalid "Gen.element requires at least one value"
 
-def oneOf (choices : Array (Gen α)) : Gen α := withSpan "lean.oneOf" do
+def oneOf (choices : Array (Gen α)) : Gen α :=
+  withEnumeration (fun _ ↦ do
+    let values ← choices.toList.mapM enumerate
+    return values.flatten) <| withSpan "lean.oneOf" do
   let selected ← element choices
   selected
 
@@ -144,7 +241,16 @@ def pair (a : Gen α) (b : Gen β) : Gen (α × β) := withSpan "lean.pair" do
 def filter (predicate : α → Bool) (gen : Gen α) (attempts : Nat := 3) : Gen α := do
   for _ in [:attempts] do
     native (startSpan · "lean.filter")
-    let a ← gen
+    let result ← ofRun fun session ↦ (gen session).toBaseIO
+    let a ← match result with
+      | .ok value => pure value
+      | .error e =>
+        match e with
+        | .recursionLeafRetry | .recursionMispriced => pure ()
+        | _ =>
+          let _ ← ofRun fun session ↦ (stopSpan session true).toBaseIO
+          pure ()
+        throw e
     let accepted := predicate a
     native (stopSpan · (!accepted))
     if accepted then return a
@@ -155,13 +261,14 @@ def array (gen : Gen α) (minSize : Nat := 0) (maxSize : Nat := 64) : Gen (Array
   withSpan "lean.array" do
     let (lo, hi) ← sizes minSize maxSize
     let id ← native (collection · lo hi)
-    let mut values := #[]
-    for _ in [:maxSize + 1] do
-      if !(← native (more · id)) then
-        native (freeCollection · id)
-        return values
-      values := values.push (← withSpan "lean.array.element" gen)
-    invalid "Engine exceeded the requested collection size"
+    ofRun fun session => do
+      try
+        let mut values := #[]
+        for _ in [:maxSize + 1] do
+          if !(← native (more · id) session) then return values
+          values := values.push (← withSpan "lean.array.element" gen session)
+        invalid "Engine exceeded the requested collection size" session
+      finally native (freeCollection · id) session
 
 def list (gen : Gen α) (minSize : Nat := 0) (maxSize : Nat := 64) : Gen (List α) :=
   Array.toList <$> array gen minSize maxSize
@@ -174,18 +281,19 @@ def vector (gen : Gen α) (n : Nat) : Gen (Vector α n) := do
 /-- Unique values use Lean equality; rejected duplicates do not consume a collection slot. -/
 def uniqueArray [BEq α] (gen : Gen α) (minSize : Nat := 0) (maxSize : Nat := 64) :
     Gen (Array α) := withSpan "lean.uniqueArray" do
-  let (lo, hi) ← sizes minSize maxSize
+  let (lo, hi) ← sizes minSize (max maxSize (minSize + 1))
+  if minSize > maxSize then invalid "Minimum size exceeds maximum size"
   let id ← native (collection · lo hi)
-  let mut values := #[]
-  -- Hegel has its own rejection budget; this additional bound keeps this frontend total.
-  for _ in [:100 * (maxSize + 1)] do
-    if !(← native (more · id)) then
-      native (freeCollection · id)
-      return values
-    let value ← withSpan "lean.uniqueArray.element" gen
-    if values.contains value then native (reject · id)
-    else values := values.push value
-  discard
+  ofRun fun session => do
+    try
+      let mut values := #[]
+      for _ in [:100 * (maxSize + 2)] do
+        if !(← native (more · id) session) then return values.extract 0 maxSize
+        let value ← withSpan "lean.uniqueArray.element" gen session
+        if values.contains value then native (reject · id) session
+        else values := values.push value
+      discard session
+    finally native (freeCollection · id) session
 
 /-- Build a recursive generator with an explicit maximum depth. -/
 def recursive (depth : Nat) (leaf : Gen α) (branch : Gen α → Gen α) : Gen α :=

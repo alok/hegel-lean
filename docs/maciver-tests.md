@@ -77,4 +77,5 @@ guard, and each CI job has a ten-minute timeout.
 The JSON is a snapshot; live CI results are uploaded as `maciver-results-<runner>` artifacts.
 The fixed seeds and witness contracts provide regression coverage, not exhaustive validation
 of the engine, statistical confidence in bug detection, or a proof of optimal shrinking on
-all inputs. No production library changes were needed for these tests.
+all inputs. The initial addition of this suite required no production library changes;
+later frontend revisions rerun it as a regression suite.

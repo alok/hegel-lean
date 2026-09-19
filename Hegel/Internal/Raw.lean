@@ -22,6 +22,11 @@ structure NativeResult where
 opaque openSession (cases seed : UInt64) (hasSeed : Bool) (database key : @& String)
     (multiple : Bool) (phases suppress : UInt32) : EIO EngineError Session.type
 
+@[extern "lean_hegel_start_run"]
+opaque startRun (s : @& Session.type) : EIO EngineError Unit
+@[extern "lean_hegel_clone"]
+opaque clone (s : @& Session.type) : EIO EngineError Session.type
+
 @[extern "lean_hegel_close"]
 opaque close (s : @& Session.type) : EIO EngineError Unit
 @[extern "lean_hegel_next"]
@@ -67,5 +72,19 @@ opaque reject (s : @& Session.type) (id : UInt64) : EIO EngineError Unit
 opaque freeCollection (s : @& Session.type) (id : UInt64) : EIO EngineError Unit
 @[extern "lean_hegel_target"]
 opaque target (s : @& Session.type) (score : Float) (label : @& String) : EIO EngineError Unit
+
+structure NativePoolEvent where
+  kind : Nat
+  pool : Nat
+  index : Nat
+  sourcePool : Nat
+  sourceIndex : Nat
+  deriving Repr
+
+@[extern "lean_hegel_drain_pool_events"]
+opaque drainPoolEvents (s : @& Session.type) : EIO EngineError (Array NativePoolEvent)
+
+@[extern "lean_hegel_output"]
+opaque output (s : @& Session.type) : EIO EngineError String
 
 end Hegel.Internal

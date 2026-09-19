@@ -4,6 +4,8 @@ This page describes the Lean frontend's configuration and reporting APIs. The fu
 inventory, including generator and stateful APIs, is in
 [`scripts/port-api.json`](../scripts/port-api.json). Executable regression coverage for this page
 is in [`Tests/Reporting.lean`](../Tests/Reporting.lean).
+The [Lean integration guide](lean-integration.md) covers v2's `Arbitrary`, automatic deriving,
+proof-carrying generators, `property%`, and registered test suites.
 
 ## Source-aware assertions
 

@@ -8,3 +8,5 @@ import Hegel.Pool
 import Hegel.Stateful.Concurrent
 import Hegel.Property.Fork
 import Hegel.Replay
+import Hegel.Deriving
+import Hegel.Testing

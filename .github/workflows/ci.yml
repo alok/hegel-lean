@@ -23,11 +23,13 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Build
-        run: lake build hegel_tests hegel_examples hegel_maciver_tests hegel_panic_probe hegel_concurrency_tests
+        run: lake build hegel_tests hegel_examples hegel_lean_examples hegel_maciver_tests hegel_panic_probe hegel_concurrency_tests
       - name: Check native ABI
         run: python3 scripts/check_ffi.py
       - name: Check port inventory
         run: python3 scripts/check_port.py
+      - name: Check Lean derivation and registration diagnostics
+        run: python3 scripts/test_elaboration.py
       - name: Integration tests
         run: lake test
       - name: Panic safety regression
@@ -44,6 +46,7 @@ jobs:
         shell: bash
         run: |
           lake exe hegel_examples
+          lake exe hegel_lean_examples
           set +e
           lake exe hegel_examples fail > failure.txt 2>&1
           status=$?

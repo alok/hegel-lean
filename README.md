@@ -9,11 +9,10 @@ failures, and saves counterexamples for the next run.
 import Hegel
 open Hegel Hegel.Property
 
-def reverseTwice : Property Unit := do
-  let xs ← forAll! (Gen.list (Gen.int (-100) 100) 0 40)
-  assertEq! xs.reverse.reverse xs
+@[hegel_test] def reverseTwice : Property Unit :=
+  property% (fun xs : List Nat => xs.reverse.reverse == xs)
 
-def main : IO Unit := check! "reverse twice" reverseTwice
+def main : IO UInt32 := runTests hegel_suite%
 ```
 
 The frontend uses native **libhegel 0.43.1** and **Lean 4.34.0**. It includes typed generator
@@ -21,6 +20,11 @@ builders, finite enumeration and filtering, native recursion budgets, source-awa
 resource management, pools, sequential and concurrent state machines, forks, structured reports,
 and persistent replay. The [port inventory](scripts/port-api.json) maps the reference API's
 feature families to Lean implementations, tests, and explicit language adaptations.
+
+V2 adds `deriving Arbitrary`, size-aware default generators, dependent data and proof-carrying
+subtypes, and compiler-checked test registration. See [Lean integration](docs/lean-integration.md)
+for examples and supported types. The complete v1 API remains available, and its stable
+baseline is preserved at [v1.0.0](https://github.com/alok/hegel-lean/releases/tag/v1.0.0).
 
 ## Install and run
 
@@ -44,12 +48,17 @@ three. Windows and Intel macOS are not supported by the build integration.
 In another Lake project using the same Lean toolchain:
 
 ```lean
-require «hegel-lean» from git "https://github.com/alok/hegel-lean" @ "v1.0.0"
+require «hegel-lean» from git "https://github.com/alok/hegel-lean" @ "v2.0.0"
 ```
 
 Run `lake update` and commit `lake-manifest.json` to retain the resolved revision. Engine fetching
 and native linking propagate to the consumer's executable. Properties run in compiled Lake
 executables; the native engine is not loaded into the editor's `#eval` process.
+
+Mark your test executable with `@[test_driver]` in `lakefile.lean` and use
+`runTests hegel_suite%` as its `main : IO UInt32`. `lake test` then runs all imported
+`@[hegel_test]` properties. [The complete Lean example](Examples/Lean.lean) also demonstrates
+derived generators with dependent proof fields: `lake exe hegel_lean_examples`.
 
 ## Generators
 
@@ -151,6 +160,8 @@ must use suitable synchronization, and clone creation must occur in a consistent
 ## Verification
 
 See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
+The [v2 validation details](docs/lean-integration.md#validation) cover deriving, proof-carrying
+shrinking, test registration, and downstream Lake use.
 
 `lake test` executes the real pinned engine. Tests cover bounds, enumeration, native recursion,
 shrinking minima, exact replay, persistence, source identities, cleanup, pool lifecycle,

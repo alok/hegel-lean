@@ -2,7 +2,7 @@ import Lake
 open System Lake DSL
 
 package «hegel-lean» where
-  version := v!"1.0.0"
+  version := v!"2.0.0"
   description := "Lean 4 frontend for Hegel's native property testing engine"
   license := "MIT"
 
@@ -41,7 +41,7 @@ lean_exe hegel_tests where
   root := `Tests.Main
 
 lean_lib Tests where
-  roots := #[`Tests.MacIver, `Tests.Generators, `Tests.Reporting, `Tests.Stateful, `Tests.Safety, `Tests.Concurrency, `Tests.Replay]
+  roots := #[`Tests.MacIver, `Tests.Generators, `Tests.Reporting, `Tests.Stateful, `Tests.Safety, `Tests.Concurrency, `Tests.Replay, `Tests.LeanFeatures, `Tests.Registered]
 
 lean_exe hegel_examples where
   root := `Examples.Main
@@ -63,3 +63,9 @@ lean_exe hegel_panic_probe where
 
 lean_exe hegel_concurrency_tests where
   root := `Tests.ConcurrencyMain
+
+lean_exe hegel_lean_tests where
+  root := `Tests.LeanFeaturesMain
+
+lean_exe hegel_lean_examples where
+  root := `Examples.Lean

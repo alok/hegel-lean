@@ -7,6 +7,7 @@ import Tests.Stateful
 import Tests.Safety
 import Tests.Concurrency
 import Tests.Replay
+import Tests.LeanFeatures
 
 open Hegel Hegel.Property
 
@@ -172,3 +173,4 @@ def main : IO Unit := do
   Tests.Safety.run
   Tests.Concurrency.run
   Tests.Replay.run
+  Tests.LeanFeatures.run

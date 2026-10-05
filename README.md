@@ -15,7 +15,7 @@ open Hegel Hegel.Property
 def main : IO UInt32 := runTests hegel_suite%
 ```
 
-The frontend uses native **libhegel 0.43.1** and **Lean 4.34.0**. It includes typed generator
+The frontend uses native **libhegel 0.43.1** and **Lean 4.34.1**. It includes typed generator
 builders, finite enumeration and filtering, native recursion budgets, source-aware assertions,
 resource management, pools, sequential and concurrent state machines, forks, structured reports,
 and persistent replay. The [port inventory](scripts/port-api.json) maps the reference API's
@@ -48,9 +48,10 @@ three. Windows and Intel macOS are not supported by the build integration.
 In another Lake project using the same Lean toolchain:
 
 ```lean
-require «hegel-lean» from git "https://github.com/alok/hegel-lean" @ "v2.0.0"
+require «hegel-lean» from git "https://github.com/alok/hegel-lean" @ "main"
 ```
 
+The immutable `v2.0.0` release uses Lean 4.34.0; current `main` uses Lean 4.34.1.
 Run `lake update` and commit `lake-manifest.json` to retain the resolved revision. Engine fetching
 and native linking propagate to the consumer's executable. Properties run in compiled Lake
 executables; the native engine is not loaded into the editor's `#eval` process.
@@ -161,7 +162,8 @@ must use suitable synchronization, and clone creation must occur in a consistent
 
 See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
 The [v2 validation details](docs/lean-integration.md#validation) cover deriving, proof-carrying
-shrinking, test registration, and downstream Lake use.
+shrinking, test registration, and downstream Lake use. The [October 5 maintenance record](docs/maintenance-2026-10-05.md)
+records the Lean 4.34.1 update and the regression blocking libhegel 0.44.1.
 
 `lake test` executes the real pinned engine. Tests cover bounds, enumeration, native recursion,
 shrinking minima, exact replay, persistence, source identities, cleanup, pool lifecycle,

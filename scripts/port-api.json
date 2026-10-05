@@ -1658,19 +1658,21 @@
     "Cancellation is cooperative at Lean draw and IO boundaries; foreign blocking IO cannot be forcibly interrupted."
   ],
   "verification": {
-    "frontendVersion": "1.0.0",
-    "leanVersion": "4.34.0",
+    "frontendVersion": "2.0.0",
+    "leanVersion": "4.34.1",
     "engineVersion": "0.43.1",
     "localPlatform": "macOS arm64",
     "commands": [
-      "lake build hegel_tests hegel_examples hegel_concurrency_tests hegel_panic_probe",
+      "lake build hegel_tests hegel_examples hegel_lean_examples hegel_concurrency_tests hegel_panic_probe",
       "lake test",
       "python3 scripts/check_ffi.py",
       "python3 scripts/check_port.py",
+      "python3 scripts/test_elaboration.py",
       "python3 scripts/test_safety.py",
       "python3 scripts/test_concurrency.py",
       "python3 scripts/test_downstream.py"
     ],
-    "platformCI": ".github/workflows/ci.yml"
+    "platformCI": ".github/workflows/ci.yml",
+    "date": "2026-10-05"
   }
 }

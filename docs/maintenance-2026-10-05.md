@@ -32,6 +32,36 @@ unchanged suite. In particular, adjacent-UInt64 seeds **0, 1, 42** all shrink to
 `(0, 1)` and replay twice. The expected witnesses and seeds have not been weakened.
 The engine update remains deferred until that regression is resolved.
 
+## Follow-up: root cause of the adjacent-UInt64 failure
+
+The later investigation found a shrinker defect that **0.43.1 also has**. The archived
+October 5 pure-Rust reproduction of `adjacent-uint64` against hegel-rust (filtered pair,
+seeds 0–199, no database) gives:
+
+| Engine | Seeds ending at a nonminimal witness |
+| --- | --- |
+| 0.43.1 (`9a130bf`) | 49 / 200 |
+| 0.44.1 (`ebfd9d5`) | 62 / 200 |
+| 0.44.1 + local fix | 0 / 200 |
+
+Seeds 0, 1, and 42 happen to pass on 0.43.1. The first bad commit for seed 0,
+`d3bbb37d` ("Add a log-uniform float category over the range's binades"), does not touch
+the shrinker. It adds a float weight that is sampled on every test case, which changes the
+starting counterexample for seed 0.
+
+Mechanism: after a deletion changes the choice sequence's length,
+`Shrinker::update_change_tracking` clears the changed-node set but keeps the stale
+checkpoint. Every later comparison is then also judged shape-changing, so the set stays empty and
+`lower_common_node_offset` never fires. The two values are lowered one at a time until
+the 500-shrink limit. The October 5 investigation left a 12-line fix locally that
+rebaselines the checkpoint when the shape changes.
+
+Keeping 0.43.1 is therefore not evidence that the older engine shrinks correctly. The
+regression test passes there because of the seeds it uses.
+
+The [October 12 record](maintenance-2026-10-12.md) independently rechecks the defect
+through the Lean frontend and records the latest release candidate.
+
 ## Validation of main
 
 The acceptance run on macOS ARM64 includes:

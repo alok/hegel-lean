@@ -23,7 +23,7 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Build
-        run: lake build hegel_tests hegel_examples hegel_lean_examples hegel_maciver_tests hegel_panic_probe hegel_concurrency_tests
+        run: lake build hegel_tests hegel_examples hegel_lean_examples hegel_maciver_tests hegel_panic_probe hegel_concurrency_tests hegel_adjacent_sweep
       - name: Check native ABI
         run: python3 scripts/check_ffi.py
       - name: Check port inventory

@@ -49,6 +49,9 @@ lean_exe hegel_examples where
 lean_exe hegel_maciver_tests where
   root := `Tests.MacIverMain
 
+lean_exe hegel_adjacent_sweep where
+  root := `Tests.AdjacentSweep
+
 lean_exe hegel_generator_tests where
   root := `Tests.GeneratorsMain
 

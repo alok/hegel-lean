@@ -79,3 +79,23 @@ The fixed seeds and witness contracts provide regression coverage, not exhaustiv
 of the engine, statistical confidence in bug detection, or a proof of optimal shrinking on
 all inputs. The initial addition of this suite required no production library changes;
 later frontend revisions rerun it as a regression suite.
+
+
+## Wider adjacent-integer diagnostic
+
+The fixed seeds above do not establish shrinking quality for every seed. The optional
+`Tests/AdjacentSweep.lean` driver runs the adjacent-UInt64 property over seeds starting at zero,
+checks the minimal witness, and reproduces each found counterexample twice:
+
+```sh
+lake exe hegel_adjacent_sweep       # 200 seeds, JSONL output
+lake exe hegel_adjacent_sweep 1000  # wider diagnostic
+```
+
+This is a **known-failing diagnostic** with the retained engine, separate from the fixed-seed
+acceptance suite. It exits 1 for any nonminimal witness, discovery miss, or execution error;
+these outcomes are never treated as passes. CI compiles the driver, while engine-upgrade
+investigations run it explicitly. Each campaign uses 1,000 examples, no database, and a
+150,000-body-call guard. The seed count is bounded to 1–10,000.
+
+See the [October 12 results](maintenance-2026-10-12.md) for the measured baseline and candidate.

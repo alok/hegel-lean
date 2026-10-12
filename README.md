@@ -162,8 +162,9 @@ must use suitable synchronization, and clone creation must occur in a consistent
 
 See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
 The [v2 validation details](docs/lean-integration.md#validation) cover deriving, proof-carrying
-shrinking, test registration, and downstream Lake use. The [October 5 maintenance record](docs/maintenance-2026-10-05.md)
-records the Lean 4.34.1 update and the regression blocking libhegel 0.44.1.
+shrinking, test registration, and downstream Lake use. The [October 12 maintenance record](docs/maintenance-2026-10-12.md)
+records the current engine upgrade blocker: a seeded shrinking defect also present in the
+retained 0.43.1 engine. The wider `hegel_adjacent_sweep` diagnostic exposes this limitation.
 
 `lake test` executes the real pinned engine. Tests cover bounds, enumeration, native recursion,
 shrinking minima, exact replay, persistence, source identities, cleanup, pool lifecycle,

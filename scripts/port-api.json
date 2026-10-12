@@ -1663,7 +1663,7 @@
     "engineVersion": "0.43.1",
     "localPlatform": "macOS arm64",
     "commands": [
-      "lake build hegel_tests hegel_examples hegel_lean_examples hegel_concurrency_tests hegel_panic_probe",
+      "lake build hegel_tests hegel_examples hegel_lean_examples hegel_maciver_tests hegel_concurrency_tests hegel_panic_probe hegel_adjacent_sweep",
       "lake test",
       "python3 scripts/check_ffi.py",
       "python3 scripts/check_port.py",
@@ -1673,6 +1673,20 @@
       "python3 scripts/test_downstream.py"
     ],
     "platformCI": ".github/workflows/ci.yml",
-    "date": "2026-10-05"
+    "date": "2026-10-12"
+  },
+  "upstreamReview": {
+    "date": "2026-10-12",
+    "reviewedSourceCommit": "9fdf9ef4af5810dbdc3e5475f5751a140157983b",
+    "commitsSincePinnedSource": 23,
+    "sourcePinChanged": false,
+    "engineCandidate": "0.45.1",
+    "engineCandidatePublished": false,
+    "notes": [
+      "Engine-owned capture, caveats, replay-run handling, and explicit regex byte lengths are implemented on the local engine candidate.",
+      "New profile registration/layering, event statistics, and engine test-location reporting are not part of the current pinned public API; the feature inventory still targets sourceCommit.",
+      "Existing Lean defaults, finite enumeration metadata, explicit single-attempt replay, and stateful configuration remain intentional public contracts."
+    ],
+    "validationRecord": "docs/maintenance-2026-10-12.md"
   }
 }

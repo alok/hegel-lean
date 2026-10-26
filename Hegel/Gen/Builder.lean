@@ -88,12 +88,21 @@ private def floatConfig (convert : α → Float) (b : FloatBuilder α) : FloatCo
     excludeMax := b.exclusiveUpper
     allowNaN := b.allowNaN && !b.lower.isSome && !b.upper.isSome
     allowInfinity := b.allowInfinity && !(b.lower.isSome && b.upper.isSome) }
-instance : Build (FloatBuilder Float) Float := ⟨fun b =>
+private def validateFloatConfig (origin : String) (c : FloatConfig) : Gen Unit := do
+  if c.min == 0 && c.max == 0 && c.min.toBits == 0 && c.max.toBits == 0x8000000000000000 then
+    validation origin "Gen.build: positive zero minimum exceeds negative zero maximum"
+  if (c.excludeMin && c.min == 1 / 0) || (c.excludeMax && c.max == -1 / 0) ||
+      (!c.allowInfinity && (c.min == 1 / 0 || c.max == -1 / 0)) then
+    validation origin "Gen.build: floating-point bounds leave no permitted values"
+instance : Build (FloatBuilder Float) Float := ⟨fun b => do
   let c := floatConfig id b
+  validateFloatConfig "float" c
   nativeValidation "float" (Internal.float · c.min c.max c.allowNaN c.allowInfinity
     c.excludeMin c.excludeMax)⟩
-instance : Build (FloatBuilder Float32) Float32 :=
-  ⟨fun b => Gen.float32 (floatConfig Float32.toFloat b)⟩
+instance : Build (FloatBuilder Float32) Float32 := ⟨fun b => do
+  let c := floatConfig Float32.toFloat b
+  validateFloatConfig "float32" c
+  Gen.float32 c⟩
 
 /-- Lengths are validated before converting to the engine's UInt64 range. -/
 structure SizedBuilder (α : Type) where
@@ -153,9 +162,11 @@ def version (value : UInt8) (b : UuidBuilder) : UuidBuilder :=
   { b with selectedVersion := some value }
 
 structure DomainBuilder where
-  limit : UInt64 := 255
-instance : Build DomainBuilder String :=
-  ⟨fun b => nativeValidation "domain" (Internal.string · 3 "" false b.limit)⟩
+  limit : UInt64 := 253
+instance : Build DomainBuilder String := ⟨fun b => do
+  if b.limit < 4 || b.limit > 253 then
+    validation "domain" "Gen.domain: maxLength must be between 4 and 253"
+  nativeValidation "domain" (Internal.string · 3 "" false b.limit)⟩
 def maxLength (value : UInt64) (b : DomainBuilder) : DomainBuilder := { b with limit := value }
 
 instance : HasYear (BoundedBuilder Date) where

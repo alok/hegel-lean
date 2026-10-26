@@ -83,7 +83,7 @@
       ],
       "contract": "Typed Build, HasMin, HasMax, HasSize, HasYear and HasAlphabet provide fluent generator configuration.",
       "status": "verified",
-      "notes": ""
+      "notes": "Rejects signed-zero inversion and infinity-only forbidden intervals before native draws."
     },
     {
       "id": "collections",
@@ -159,7 +159,7 @@
       ],
       "contract": "Native format generation; UUID version/variant constraints; structured URI preserves generated encoded components.",
       "status": "verified",
-      "notes": "URI parser supports the generated HTTP(S) language; it is not a general URI parser."
+      "notes": "URI parser supports the generated HTTP(S) language; it is not a general URI parser. Domain text length defaults to 253 and accepts limits from 4 through 253."
     },
     {
       "id": "temporal_generators",
@@ -202,7 +202,7 @@
       ],
       "contract": "Native recursion budgets share leaf/depth limits, expose recursion context and reject exhausted recursive draws.",
       "status": "verified",
-      "notes": ""
+      "notes": "A zero leaf budget is a stable replayable validation failure rather than rejection exhaustion."
     },
     {
       "id": "generator_combinators",
@@ -1670,23 +1670,27 @@
       "python3 scripts/test_elaboration.py",
       "python3 scripts/test_safety.py",
       "python3 scripts/test_concurrency.py",
-      "python3 scripts/test_downstream.py"
+      "python3 scripts/test_downstream.py",
+      "python3 scripts/test_engine_update.py"
     ],
     "platformCI": ".github/workflows/ci.yml",
-    "date": "2026-10-19"
+    "date": "2026-10-26"
   },
   "upstreamReview": {
-    "date": "2026-10-19",
-    "reviewedSourceCommit": "9fdf9ef4af5810dbdc3e5475f5751a140157983b",
-    "commitsSincePinnedSource": 23,
+    "date": "2026-10-26",
+    "reviewedSourceCommit": "603eec1c70f4f6e1e445cdf0847c6723fd63997e",
+    "commitsSincePinnedSource": 58,
     "sourcePinChanged": false,
-    "engineCandidate": "0.47.1",
+    "engineCandidate": "0.48.0",
+    "engineCandidateRepository": "https://github.com/hegeldev/hegel",
     "engineCandidatePublished": false,
     "notes": [
-      "Engine-owned capture, caveats, replay-run handling, and length-delimited string inputs and outputs are implemented on the local engine candidate; all 39 fixed-seed regressions pass, but the wider seeded shrinking diagnostic still fails.",
-      "New profile registration/layering, event statistics, and engine test-location reporting are not part of the current pinned public API; the feature inventory still targets sourceCommit.",
-      "Existing Lean defaults, finite enumeration metadata, explicit single-attempt replay, and stateful configuration remain intentional public contracts."
+      "Reviewed 35 reference commits since October 19. Fixed early-exit fork handling, bounded native clone allocation, replay envelope decoding, zero recursive leaf budgets, domain text limits, and invalid floating-point builder intervals.",
+      "Existing ABI checks, Unicode validation, rule-index failure origins, trace elision, retained abort statistics, and explicit replay exhaustion already cover the corresponding reference changes. Worker journals are folded after joins; top-level test identity uses exact declaration names.",
+      "Engine-owned capture, caveats, replay-run handling, and length-delimited string inputs and outputs remain on the local 0.48.0 candidate; all 39 fixed-seed regressions pass, but the wider 200-seed shrinking diagnostic still fails.",
+      "New engine error-kind classification, stopOnFirstFailure, profile and Unicode-version settings, rejected-attempt pool restoration, and sequence generators remain outside the pinned public API. The feature inventory still targets sourceCommit.",
+      "Existing Lean defaults, finite enumeration metadata, explicit single-attempt replay, stateful configuration, ordered weighted choice, and unary floating-bound exclusivity modifiers remain intentional public contracts."
     ],
-    "validationRecord": "docs/maintenance-2026-10-19.md"
+    "validationRecord": "docs/maintenance-2026-10-26.md"
   }
 }

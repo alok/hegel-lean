@@ -80,6 +80,45 @@ def run : IO Unit := do
     pure ()
   require (branchCounterexample.annotations.contains "child value = 5")
     "Branch failure did not shrink to five"
+  for inBranch in #[false, true] do
+    let withOpenFork (ending : Property Unit) : Property Unit := do
+      let started ← Std.Channel.Sync.new
+      let finished ← IO.mkRef false
+      let fork ← Hegel.Property.Fork.spawn (cancellable started finished)
+      started.recv
+      registerFinalizer do
+        unless ← finished.get do throw (IO.userError "Early-exit fork did not finish cleanup")
+      ending
+      Hegel.Property.Fork.cancel fork
+    let wrap (action : Property Unit) : Property Unit :=
+      if inBranch then Hegel.Property.Branch.replicateConcurrently_ 1 action else action
+    let name := if inBranch then "branch early exit" else "root early exit"
+    let found ← failureReplay s!"{name} preserves failure with an open fork" <|
+      wrap <| withOpenFork do
+        let n ← forAll (Gen.nat 0 20) "n"
+        assertThat (n < 5) "fork/early-failure"
+    require (found.origin == "fork/early-failure" && found.annotations.contains "n = 5")
+      "Early exit lost its failure or shrinking minimum"
+    let rejected ← check s!"{name} preserves discard" (wrap (withOpenFork discard)) settings
+    require (rejected.outcome == .error && rejected.stats.invalid > 0 &&
+      !rejected.message.contains "Malformed property") rejected.render
+    let exhausted ← check s!"{name} preserves overrun" (wrap (withOpenFork (throw .overrun))) settings
+    require (exhausted.outcome == .error && exhausted.stats.overruns > 0 &&
+      !exhausted.message.contains "Malformed property") exhausted.render
+  let cleanupFailure ← check "early failure retains fork cleanup diagnostics" (do
+    let started ← Std.Channel.Sync.new
+    let finished ← IO.mkRef false
+    let _ ← Hegel.Property.Fork.spawn do
+      registerFinalizer (throw (IO.userError "early fork release failed"))
+      cancellable started finished
+    started.recv
+    failure "fork/body-before-cleanup") settings
+  require (cleanupFailure.outcome == .error && cleanupFailure.cleanupDiagnostics.size == 1 &&
+    cleanupFailure.failures.any (·.origin == "fork/body-before-cleanup")) cleanupFailure.render
+  let boundedCounterexample ← failureReplay "bounded branch draws shrink and replay" do
+    Hegel.Property.Branch.replicateConcurrentlyBounded 2 5 childFailure *> pure ()
+  require (boundedCounterexample.annotations.contains "child value = 5")
+    "Bounded branch failure did not shrink to five"
   passes "repeated joins fold observations once" do
     let fork ← Hegel.Property.Fork.spawn do annotate "one child observation"; return (17 : Nat)
     assertEq (← Hegel.Property.Fork.join fork) 17 "fork/result"
@@ -162,7 +201,7 @@ def run : IO Unit := do
   passes "cancellation propagates through a nested fork join" (nestedCancellation 0)
   passes "cancellation propagates through a nested branch join" (nestedCancellation 1)
   passes "cancellation propagates through a persistent worker round" (nestedCancellation 2)
-  passes "bounded cancellation releases unstarted clones without running their bodies" do
+  passes "bounded cancellation skips later batches and cleans up running workers" do
     let started ← Std.Channel.Sync.new
     let finished ← IO.mkRef false
     let executions ← Std.Mutex.new (0 : Nat)

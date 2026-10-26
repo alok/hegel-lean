@@ -18,6 +18,11 @@ private def reasonIs (report : Report) (reason : ReplayReason) : Bool :=
     match failure.evidence with | .diverged actual => actual == reason | _ => false
 
 def run : IO Unit := do
+  for version in #["0.43.1", "local:debug", ":local:"] do
+    for origin in #["", "λ:origin\x00"] do
+      let token : ReplayToken := ⟨version, origin, "blob"⟩
+      require ((decodeReplayToken (encodeReplayToken token)).toOption == some token)
+        s!"Replay token did not roundtrip: {reprStr token}"
   let encoded := encodeReplayToken ⟨"0.43.1", "λ:origin\x00", "blob"⟩
   require (encoded == "hegel-replay:0.43.1:cebb3a6f726967696e00:blob") "Replay encoding changed"
   require ((decodeReplayToken encoded).toOption == some ⟨"0.43.1", "λ:origin\x00", "blob"⟩)

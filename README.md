@@ -147,10 +147,12 @@ that rules create, reuse, consume, and transfer, with their lineage retained in 
 cloned engine stream per worker across rounds. A round joins before root-thread invariants run;
 rules in different groups do not overlap.
 
-`Property.Branch` offers pairs, mapping, replication, and bounded fan-out. Results retain input
-order and every branch settles before a failure returns. `Property.Fork` offers `spawn`, `join`,
+`Property.Branch` offers pairs, mapping, replication, and bounded fan-out. Bounded replication
+caps both active workers and native clones. Results retain input order and every branch settles
+before a failure returns. `Property.Fork` offers `spawn`, `join`,
 `poll`, `cancel`, and `scoped`. Polling does not discharge a fork's join-or-cancel obligation;
-an abandoned fork is a malformed test.
+a fork left open after a normal return is a malformed test. Early failure, discard, or exhaustion
+cancels and settles open forks while preserving the original outcome and cleanup diagnostics.
 
 Choice streams can replay; real-time thread interleavings cannot be guaranteed to replay. When
 the engine reports a nondeterministic failure without a blob, the observed journal is retained.
@@ -162,8 +164,8 @@ must use suitable synchronization, and clone creation must occur in a consistent
 
 See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
 The [v2 validation details](docs/lean-integration.md#validation) cover deriving, proof-carrying
-shrinking, test registration, and downstream Lake use. The [October 19 maintenance record](docs/maintenance-2026-10-19.md)
-records the toolchain update and current engine upgrade blocker: a seeded shrinking defect
+shrinking, test registration, and downstream Lake use. The [October 26 maintenance record](docs/maintenance-2026-10-26.md)
+records the frontend fixes and current engine upgrade blocker: a seeded shrinking defect
 also present in the retained 0.43.1 engine. The wider `hegel_adjacent_sweep` diagnostic
 exposes this limitation.
 
@@ -198,6 +200,7 @@ false pass. Ordinary property assertion failures still shrink and replay.
 CI runs on pushes, pull requests, manual dispatch, and weekly. Engine updates are deliberate:
 
 ```sh
+python3 scripts/update_engine.py --dry-run  # inspect the proposed lock
 python3 scripts/update_engine.py
 lake build hegel_tests hegel_examples
 lake test
@@ -209,7 +212,9 @@ python3 scripts/test_downstream.py
 Review upstream changes and all platform results before accepting a new pin. Engine source,
 release tag, artifact URLs, and hashes are recorded in `engine-lock.json`; builds never silently
 follow upstream `main`. The current [engine source](https://github.com/hegeldev/hegel-rust/tree/9a130bfde99005504b0004428e047803ac18d3a0/hegel-c)
-is pinned for inspection.
+is pinned for inspection. New releases are discovered in the
+[engine monorepo](https://github.com/hegeldev/hegel/releases); legacy `libhegel-v*` tags
+remain available through `--tag`, and existing locked downloads keep their original URLs.
 
 MIT licensed. See [LICENSE](LICENSE) and the engine's [license](vendor/HEGEL-LICENSE).
 This is an independent frontend.

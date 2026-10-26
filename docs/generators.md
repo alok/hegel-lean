@@ -37,7 +37,9 @@ Modifiers have types: `Gen.maxSize` accepts collection builders, `Gen.minYear`
 accepts dates and datetimes, and `Gen.disallowNaN` accepts floating-point builders.
 Applying one to an unrelated builder is a Lean type error. Setting either floating
 bound excludes NaN; setting both also excludes infinity. Direct `Gen.float` and
-`Gen.float32` take explicit `FloatConfig` flags instead.
+`Gen.float32` take explicit `FloatConfig` flags instead. Builders reject an interval from
+positive zero to negative zero and bounds that leave only a forbidden infinity before
+calling the engine. The signed-zero interval from negative zero to positive zero remains valid.
 
 `Gen.int` supports arbitrary precision when both bounds are supplied. The signed
 8/16/32/64-bit, unsigned 8/16/32/64-bit, `ISize`, and `USize` generators cover their
@@ -142,7 +144,10 @@ Regex alphabets constrain wildcard and padding choices using the native engine.
 `0..15` fixes the version nibble and RFC variant; no version requests native
 unconstrained non-nil UUID generation. Its renderer uses the usual 36-character
 hyphenated representation. `Gen.email`, `Gen.domain`, and `Gen.uriText` expose the
-native format generators. `Gen.uri` parses the generated absolute HTTP(S) URI into
+native format generators. Domain limits must be between 4 and 253 characters and default
+to 253, the text-form limit. An invalid typed domain builder produces a validation
+counterexample; the direct `Gen.domain` API reports an error. `Gen.uri` parses the generated
+absolute HTTP(S) URI into
 scheme, authority, path, optional query, and optional fragment. `URIAuth` separates
 encoded user information, host (including bracketed IP literals), and explicit port
 text, preserving details such as leading port zeros and an empty fragment. It validates
@@ -194,7 +199,8 @@ is the exact interval between the two extreme supported dates, `730484633` days.
 
 Use `Gen.Builder.recursive` when a value has a meaningful shared leaf budget.
 It provides the branch's depth and the configured maximum depth, plus a generator
-for a child. Depth zero means the whole value must be a leaf.
+for a child. Depth zero means the whole value must be a leaf. `Gen.maxLeaves` must be
+at least one; zero is a configuration failure rather than a run of discarded cases.
 
 ```lean
 inductive Tree where

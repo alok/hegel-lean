@@ -91,17 +91,14 @@ private def runBranches (cap : Nat)
   if cap == 0 then throw (.error "Concurrency cap must be at least one")
   if actions.isEmpty then return #[]
   Property.Worker.checkDepth parent
-  let sessions ← acquire parent actions.size
   let mut results := #[]
-  let jobs := sessions.zip actions
   let mut start := 0
   while start < actions.size do
-    if ← IO.checkCanceled then
-      for session in sessions.toList.drop start do
-        let _ ← (Internal.close session).toBaseIO
-      throw (.error "Property cancelled")
+    if ← IO.checkCanceled then throw (.error "Property cancelled")
+    let batch := actions.extract start (start + cap)
+    let sessions ← acquire parent batch.size
     let mut tasks := #[]
-    for (session, action) in jobs.toList.drop start |>.take cap do
+    for (session, action) in sessions.zip batch do
       let context ← Property.Worker.childContext parent session
       let task ← BaseIO.asTask (do
         let result ← Property.Worker.run context action
@@ -109,10 +106,11 @@ private def runBranches (cap : Nat)
         | .ok () => return result
         | .error error => return { result with outcome := .error error }) .dedicated
       tasks := tasks.push task
-    for task in tasks do results := results.push (← Property.Worker.waitTask task)
+    for task in tasks do
+      let result ← Property.Worker.waitTask task
+      Property.Worker.fold (results.size + 1) result "Branch" parent
+      results := results.push result
     start := start + cap
-  for (result, index) in results.zipIdx do
-    Property.Worker.fold (index + 1) result "Branch" parent
   if let some error := Property.Worker.chooseError results then throw error
   return results.filterMap fun result ↦ match result.outcome with | .ok value => some value | _ => none
 

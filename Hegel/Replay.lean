@@ -51,9 +51,13 @@ private def decodeOrigin (text : String) : Except ReplayError String := do
 
 def decodeReplayToken (text : String) : Except ReplayError ReplayToken := do
   match text.splitOn ":" with
-  | ["hegel-replay", version, origin, blob] =>
-    if version.isEmpty || origin.isEmpty || blob.isEmpty then throw .emptyField
-    return ⟨version, ← decodeOrigin origin, blob⟩
+  | "hegel-replay" :: fields =>
+    match fields.reverse with
+    | blob :: origin :: versionParts@(_ :: _) =>
+      let version := String.intercalate ":" versionParts.reverse
+      if version.isEmpty || blob.isEmpty then throw .emptyField
+      return ⟨version, ← decodeOrigin origin, blob⟩
+    | _ => throw .malformedEnvelope
   | format :: _ =>
     if format != "hegel-replay" then throw (.unsupportedFormat format)
     throw .malformedEnvelope

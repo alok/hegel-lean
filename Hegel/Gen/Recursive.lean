@@ -69,6 +69,8 @@ private partial def retryRecursion (b : RecursiveBuilder α) (id : UInt64) : Gen
 
 /-- Native recursion enforces both depth and a shared leaf budget across the whole value. -/
 def recursiveNative (b : RecursiveBuilder α) : Gen α := do
+  if b.leafLimit == 0 then
+    validation "recursiveNative" "Gen.recursiveNative: maxLeaves must be at least 1"
   if b.depthLimit ≥ 2 ^ 64 || b.leafLimit ≥ 2 ^ 64 then
     validation "recursiveNative" "Gen.recursiveNative: bound exceeds UInt64"
   let id ← native (Internal.newRecursion · b.depthLimit.toUInt64 b.leafLimit.toUInt64)

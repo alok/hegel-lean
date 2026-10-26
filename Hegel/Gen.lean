@@ -212,7 +212,9 @@ def regex (pattern : String) (fullMatch : Bool := true) : Gen String :=
   native (Internal.string · 0 pattern fullMatch 0)
 def email : Gen String := native (Internal.string · 1 "" false 0)
 def url : Gen String := native (Internal.string · 2 "" false 0)
-def domain (maxLength : UInt64 := 255) : Gen String :=
+def domain (maxLength : UInt64 := 253) : Gen String := do
+  if maxLength < 4 || maxLength > 253 then
+    invalid "Gen.domain: maxLength must be between 4 and 253"
   native (Internal.string · 3 "" false maxLength)
 
 /-- Choose from a finite array. An empty array is a configuration error. -/

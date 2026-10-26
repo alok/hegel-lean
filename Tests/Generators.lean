@@ -63,6 +63,47 @@ instance : Gen.Enumeration Bool := ⟨#[false, true]⟩
 private instance : Gen.Enumeration Unit := ⟨#[]⟩
 
 def run : IO Unit := do
+  rejects "generator/zero-recursive-leaves" do
+    let _ ← draw (treeGen 5 0)
+    pure ()
+  for limit in #[0, 3, 254, 255] do
+    rejects s!"generator/invalid-domain-length-{limit}" do
+      let _ ← draw (Gen.build <| Gen.maxLength limit Gen.Builder.domain)
+      pure ()
+  let invalidDomain ← check "generator/direct-invalid-domain" (do
+    let _ ← draw (Gen.domain 254)
+    pure ()) settings
+  require (invalidDomain.outcome == .error && invalidDomain.message.contains "between 4 and 253")
+    "Direct domain generation lost its engine-error API"
+  rejects "generator/float-positive-to-negative-zero" do
+    let _ ← draw (Gen.build <| Gen.min (0.0 : Float) <|
+      Gen.max (-0.0 : Float) Gen.Builder.float)
+    pure ()
+  rejects "generator/float-infinity-only-disallowed" do
+    let _ ← draw (Gen.build <| Gen.disallowInfinity <|
+      Gen.min (1 / 0 : Float) Gen.Builder.float)
+    pure ()
+  rejects "generator/float32-positive-to-negative-zero" do
+    let _ ← draw (Gen.build <| Gen.min (0.0 : Float32) <|
+      Gen.max (-0.0 : Float32) Gen.Builder.float32)
+    pure ()
+  rejects "generator/float32-infinity-only-disallowed" do
+    let _ ← draw (Gen.build <| Gen.disallowInfinity <|
+      Gen.max (-1 / 0 : Float32) Gen.Builder.float32)
+    pure ()
+  rejects "generator/float-exclusive-infinity" do
+    let _ ← draw (Gen.build <| Gen.exclusiveMin <|
+      Gen.min (1 / 0 : Float) Gen.Builder.float)
+    pure ()
+  passes "generator/signed-zero-and-permitted-infinity" do
+    let zero ← draw (Gen.build <| Gen.min (-0.0 : Float) <|
+      Gen.max (0.0 : Float) Gen.Builder.float)
+    assertThat (zero.toBits == 0 || zero.toBits == 0x8000000000000000) "float/zero bits"
+    let inf ← draw (Gen.build <| Gen.min (1 / 0 : Float) Gen.Builder.float)
+    assertEq inf (1 / 0 : Float) "float/infinity allowed"
+  passes "generator/domain-text-length" do
+    assertThat ((← draw (Gen.build Gen.Builder.domain)).length ≤ 253) "domain/text cap"
+    assertThat ((← draw (Gen.domain)).length ≤ 253) "domain/direct text cap"
   passes "generator/integer-widths" do
     let a ← draw Gen.int8
     let b ← draw Gen.int16

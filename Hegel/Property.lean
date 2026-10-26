@@ -202,7 +202,8 @@ def runInContext (context : Context) (action : Property α) : BaseIO (Except Abo
     unless ← fork.settled.get do
       fork.cancel
       fork.settled.set true
-      result := .error (.error "Malformed property: a fork was neither joined nor cancelled")
+      if let .ok _ := result then
+        result := .error (.error "Malformed property: a fork was neither joined nor cancelled")
   let finalizers ← context.finalizers.get
   context.finalizers.set #[]
   for release in finalizers.reverse do

@@ -62,7 +62,21 @@ private def treeGen (depth leaves : Nat) : Gen Tree :=
 instance : Gen.Enumeration Bool := ⟨#[false, true]⟩
 private instance : Gen.Enumeration Unit := ⟨#[]⟩
 
+private def checkLargeExplicitMax : IO Unit := do
+  -- libhegel 0.49 reserves 2^64 - 2 for an omitted maximum. At a minimum of
+  -- 100 that sentinel caps the size at 100, unlike the user's explicit bound.
+  let hi : Nat := 2^64 - 2
+  let generators : List (String × Gen Nat) := [
+    ("bytes", ByteArray.size <$> Gen.bytes 100 hi),
+    ("text", String.length <$> Gen.text { minSize := 100, maxSize := hi }),
+    ("alphabet", String.length <$> Alphabet.lower.text 100 hi),
+    ("collection", Array.size <$> Gen.array Gen.bool 100 hi)]
+  for (label, gen) in generators do
+    let sizes ← samples 32 gen settings
+    require (sizes.any (· > 100)) s!"{label}: explicit maximum was treated as the engine default"
+
 def run : IO Unit := do
+  checkLargeExplicitMax
   rejects "generator/zero-recursive-leaves" do
     let _ ← draw (treeGen 5 0)
     pure ()

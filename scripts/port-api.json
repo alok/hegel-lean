@@ -1674,23 +1674,23 @@
       "python3 scripts/test_engine_update.py"
     ],
     "platformCI": ".github/workflows/ci.yml",
-    "date": "2026-10-26"
+    "date": "2026-11-02"
   },
   "upstreamReview": {
-    "date": "2026-10-26",
+    "date": "2026-11-02",
     "reviewedSourceCommit": "603eec1c70f4f6e1e445cdf0847c6723fd63997e",
     "commitsSincePinnedSource": 58,
     "sourcePinChanged": false,
-    "engineCandidate": "0.48.0",
+    "engineCandidate": "0.49.0",
     "engineCandidateRepository": "https://github.com/hegeldev/hegel",
     "engineCandidatePublished": false,
     "notes": [
-      "Reviewed 35 reference commits since October 19. Fixed early-exit fork handling, bounded native clone allocation, replay envelope decoding, zero recursive leaf budgets, domain text limits, and invalid floating-point builder intervals.",
+      "The API reference head is unchanged since October 26. The 0.49.0 engine candidate needs a renamed native recursion handle and explicit maximum-size translation. Both the candidate and the published pin are tested for the explicit size bound.",
       "Existing ABI checks, Unicode validation, rule-index failure origins, trace elision, retained abort statistics, and explicit replay exhaustion already cover the corresponding reference changes. Worker journals are folded after joins; top-level test identity uses exact declaration names.",
-      "Engine-owned capture, caveats, replay-run handling, and length-delimited string inputs and outputs remain on the local 0.48.0 candidate; all 39 fixed-seed regressions pass, but the wider 200-seed shrinking diagnostic still fails.",
+      "Engine-owned capture, caveats, replay-run handling, and length-delimited string inputs and outputs remain on the local 0.49.0 candidate; all 39 fixed-seed regressions pass, but the wider 200-seed shrinking diagnostic still fails.",
       "New engine error-kind classification, stopOnFirstFailure, profile and Unicode-version settings, rejected-attempt pool restoration, and sequence generators remain outside the pinned public API. The feature inventory still targets sourceCommit.",
       "Existing Lean defaults, finite enumeration metadata, explicit single-attempt replay, stateful configuration, ordered weighted choice, and unary floating-bound exclusivity modifiers remain intentional public contracts."
     ],
-    "validationRecord": "docs/maintenance-2026-10-26.md"
+    "validationRecord": "docs/maintenance-2026-11-02.md"
   }
 }

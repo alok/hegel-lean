@@ -164,10 +164,9 @@ must use suitable synchronization, and clone creation must occur in a consistent
 
 See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
 The [v2 validation details](docs/lean-integration.md#validation) cover deriving, proof-carrying
-shrinking, test registration, and downstream Lake use. The [October 26 maintenance record](docs/maintenance-2026-10-26.md)
-records the frontend fixes and current engine upgrade blocker: a seeded shrinking defect
-also present in the retained 0.43.1 engine. The wider `hegel_adjacent_sweep` diagnostic
-exposes this limitation.
+shrinking, test registration, and downstream Lake use. The [November 2 engine review](docs/maintenance-2026-11-02.md)
+records the 0.49.0 compatibility changes and the 200-seed shrinking diagnostic
+that still blocks the upgrade. The retained 0.43.1 engine also has this limitation.
 
 `lake test` executes the real pinned engine. Tests cover bounds, enumeration, native recursion,
 shrinking minima, exact replay, persistence, source identities, cleanup, pool lifecycle,

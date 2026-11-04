@@ -38,6 +38,7 @@ jobs:
         run: |
           lake exe hegel_fuzz 2 200
           lake exe hegel_fuzz_harness 0 200 100
+          lake exe hegel_fuzz_harness 0 50 50 machines
       - name: Panic safety regression
         run: python3 scripts/test_safety.py
       - name: Concurrency watchdog

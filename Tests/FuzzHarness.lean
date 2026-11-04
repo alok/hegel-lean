@@ -1,4 +1,5 @@
 import Hegel
+import Hegel.Stateful
 
 /-! Differential fuzzing of the runner: random generator programs, random failure predicates.
 
@@ -226,16 +227,97 @@ def runOne (seed : Nat) (examples : Nat) : IO Verdict := do
             return .bug s!"token replay {repr r.outcome} for {shown}\n{r.render}"
     return .ok "failed+replayed"
 
+/-! ## Random state machines -/
+
+inductive RuleKind where
+  | push (p : Prog)
+  | pop
+  | popAssume
+  | clear
+  | buggy (limit : Nat)
+  deriving Repr, Inhabited
+
+def ruleKind (depth : Nat) : R RuleKind := do
+  match ← below 5 with
+  | 0 => return .push (← prog depth)
+  | 1 => return .pop
+  | 2 => return .popAssume
+  | 3 => return .clear
+  | _ => return .buggy (← below 30)
+
+def ruleBody (i : Nat) : RuleKind → List V → Property (List V)
+  | .push p, stack => do
+    let v ← forAll p.gen "pushed"
+    Stateful.respondShow v.weight
+    return v :: stack
+  | .pop, stack => return stack.drop 1
+  | .popAssume, stack => do
+    assume (!stack.isEmpty)
+    return stack.drop 1
+  | .clear, _ => return []
+  | .buggy limit, stack => do
+    assertThat ((stack.map V.weight).sum < limit + 5) s!"stack/r{i}" "stack too heavy"
+    return stack
+
+def depthInvariant (n : Nat) : Stateful.Invariant (List V) where
+  name := "depth"
+  check stack := assertThat (stack.length < n + 2) "stack/depth" "stack too deep"
+
+def machineOf (kinds : List (RuleKind × Nat)) (invLimit : Option Nat) (steps : Nat) :
+    Stateful.Machine (List V) where
+  initial := pure []
+  rules := kinds.toArray.mapIdx fun i (k, w) => ⟨s!"r{i}", ruleBody i k, (w + 1).toFloat⟩
+  invariants := (invLimit.map depthInvariant).toArray
+  stepCount := some steps
+
+def runMachine (seed : Nat) (examples : Nat) : IO Verdict := do
+  let gen : R (List (RuleKind × Nat) × Option Nat × Nat) := do
+    let n := (← below 4) + 1
+    let kinds ← (List.range n).mapM fun _ => return (← ruleKind 2, ← below 3)
+    let inv ← if (← below 2) == 0 then pure none else some <$> below 8
+    return (kinds, inv, (← below 20) + 1)
+  let ((kinds, inv, steps), _) := gen.run ⟨seed.toUInt64 * 104729 + 7⟩
+  let kinds := kinds.map fun (k, w) => match k with
+    | .push p => (.push p.normalize, w)
+    | k => (k, w)
+  let property := Stateful.run (machineOf kinds inv steps)
+  let settings : Settings := { seed := some seed.toUInt64, maxExamples := examples.toUInt64, database := none }
+  let report ← check s!"machine {seed}" property settings
+  let shown := (reprStr (kinds, inv, steps)).take 600
+  match report.outcome with
+  | .passed => return .ok "passed"
+  | .error =>
+    if (report.message.splitOn "FailedHealthCheck").length > 1 ||
+       (report.message.splitOn "Unsatisfiable").length > 1 then return .ok "health"
+    return .bug s!"machine error for {shown}\n{report.render}"
+  | .nondeterministic => return .bug s!"machine nondeterministic for {shown}\n{report.render}"
+  | .failed =>
+    for f in report.failures do
+      let first ← replay f.blob property settings
+      for _ in [:2] do
+        let again ← replay f.blob property settings
+        if again.status != .failed || again.origin != f.origin || again.annotations != first.annotations then
+          return .bug s!"machine replay diverged for {shown}"
+      if first.annotations != f.annotations then
+        return .bug s!"machine report/replay annotations differ for {shown}\n{f.annotations}\n{first.annotations}"
+      if let some token ← f.replayToken then
+        let r ← replayToken token property settings
+        if r.outcome != .failed then return .bug s!"machine token replay {repr r.outcome} for {shown}\n{r.render}"
+    return .ok "failed+replayed"
+
 end Tests.FuzzHarness
 
 def main (args : List String) : IO UInt32 := do
   let start := (args[0]? >>= String.toNat?).getD 0
   let count := (args[1]? >>= String.toNat?).getD 200
   let examples := (args[2]? >>= String.toNat?).getD 100
+  let machines := args[3]? == some "machines"
   let mut bugs := 0
   let mut tally : Std.HashMap String Nat := {}
   for seed in [start:start + count] do
-    match ← Tests.FuzzHarness.runOne seed examples with
+    let verdict ← if machines then Tests.FuzzHarness.runMachine seed examples
+      else Tests.FuzzHarness.runOne seed examples
+    match verdict with
     | .ok kind => tally := tally.insert kind (tally.getD kind 0 + 1)
     | .bug detail =>
       bugs := bugs + 1

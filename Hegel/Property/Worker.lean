@@ -15,15 +15,20 @@ def native (action : EIO Internal.EngineError α) : EIO Abort α :=
     else if error.code == -2 then .discard
     else .error (toString error)
 
+/-- Pause between polls of a child. Most children finish within microseconds, and `IO.sleep` has a
+1 ms floor, so a poll loop spins for the first 200 µs (measured from `start`) before sleeping. -/
+def pollPause (start : Nat) : BaseIO Unit := do
+  if (← IO.monoNanosNow) - start >= 200000 then IO.sleep 1
+
 /-- Waiting on a child remains a cancellation boundary, so nested forks settle transitively. -/
-private partial def waitReady (task : Task α) : BaseIO Unit := do
+private partial def waitReady (task : Task α) (start : Nat) : BaseIO Unit := do
   unless ← IO.hasFinished task do
     if ← IO.checkCanceled then IO.cancel task
-    IO.sleep 1
-    waitReady task
+    pollPause start
+    waitReady task start
 
 def waitTask (task : Task α) : BaseIO α := do
-  waitReady task
+  waitReady task (← IO.monoNanosNow)
   IO.wait task
 
 def checkDepth (context : Context) : EIO Abort Unit := do

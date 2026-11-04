@@ -198,6 +198,20 @@ def run : IO Unit := do
     | .failure "scoped/body failure" _ => pure ()
     | other => throw other
     assertThat (← finished.get) "fork/scoped exceptional cleanup"
+  -- A parent that fails before joining races its fork's next draw against cancellation, which
+  -- made shrinking report flaky outcomes. Joining before rethrowing, as `Fork.spawn` documents,
+  -- keeps the recorded choices identical across runs.
+  for seed in [:40] do
+    let report ← check "parent failure settles its fork before rethrowing" (do
+      let fork ← Hegel.Property.Fork.spawn (forAll (Gen.nat 0 1) "child")
+      try
+        let _ ← forAll (do let _ ← Gen.nat 0 1; Gen.nat 0 1) "parent"
+        failure "parent/always"
+      catch e => do
+        (try discard (Hegel.Property.Fork.join fork) catch _ => pure ())
+        throw e) { settings with seed := some seed.toUInt64, maxExamples := 100 }
+    require (report.outcome == .failed) s!"seed {seed}: {report.render}"
+  log "ok: parent failure settles its fork before rethrowing"
   passes "cancellation propagates through a nested fork join" (nestedCancellation 0)
   passes "cancellation propagates through a nested branch join" (nestedCancellation 1)
   passes "cancellation propagates through a persistent worker round" (nestedCancellation 2)

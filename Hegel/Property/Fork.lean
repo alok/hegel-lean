@@ -9,7 +9,19 @@ structure Fork (α : Type) where
   private alive : IO.Ref Bool
   private index : Nat
 
-/-- Start a dedicated worker after allocating its stream in deterministic parent order. -/
+/-- Start a dedicated worker after allocating its stream in deterministic parent order.
+
+Join or cancel the fork on every path, including the paths where the parent fails or a parent draw
+aborts. If the parent ends first, the property cancels the fork, but cancellation is cooperative:
+whether the child made its next draw before it saw the cancellation depends on thread timing. The
+recorded choices then differ between runs, and shrinking or replay can report the test as flaky.
+To keep such a property deterministic, join the fork before rethrowing:
+
+```
+let fork ← Fork.spawn child
+let value ← try parentStep catch e => do (try discard (Fork.join fork) catch _ => pure ()); throw e
+```
+-/
 def spawn (body : Property α) : Property (Fork α) := do
   let parent ← getContext
   Worker.checkDepth parent

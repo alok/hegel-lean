@@ -20,15 +20,15 @@ structure WorkerTeam where
   private workers : Array Worker
   private closed : IO.Ref Bool
 
-private partial def waitResponse (team : WorkerTeam) (worker : Worker) :
+private partial def waitResponse (team : WorkerTeam) (worker : Worker) (start : Nat) :
     BaseIO (Option (Property.Worker.Result Unit)) := do
   match ← worker.responses.tryRecv with
   | some response => return response
   | none =>
     if ← IO.checkCanceled then
       for member in team.workers do IO.cancel member.task
-    IO.sleep 1
-    waitResponse team worker
+    Property.Worker.pollPause start
+    waitResponse team worker start
 
 /-- Dispatch one round to persistent threads, then join every worker before returning. -/
 def WorkerTeam.runRound (team : WorkerTeam) (actions : Array (Property Unit)) : Property Unit := do
@@ -38,7 +38,7 @@ def WorkerTeam.runRound (team : WorkerTeam) (actions : Array (Property Unit)) : 
   for (worker, action) in team.workers.zip actions do worker.requests.send (some action)
   let mut results := #[]
   for worker in team.workers do
-    let some result ← waitResponse team worker | throw (.error "Worker ended without a result")
+    let some result ← waitResponse team worker (← IO.monoNanosNow) | throw (.error "Worker ended without a result")
     results := results.push result
   for (result, index) in results.zipIdx do
     Property.Worker.fold (index + 1) result

@@ -183,9 +183,22 @@ def runOne (seed : Nat) (examples : Nat) : IO Verdict := do
   let p := p.normalize
   let (threshold, _) := (below 12).run rng
   let gen := p.gen
-  let (shape, _) := (below 4).run rng
+  let (shape, _) := (below 7).run rng
+  let drawOne : Property V := forAll gen "value"
   let property : Property Unit := do
-    let v ← forAll gen "value"
+    let v ← match shape with
+      | 4 => do
+        let f ← Hegel.Property.Fork.spawn drawOne
+        -- Settle the fork even when the parent's draw aborts; see `Fork.spawn`.
+        let w ← try drawOne catch e => do
+          (try discard (Hegel.Property.Fork.join f) catch _ => pure ())
+          throw e
+        pure (V.pair (← Hegel.Property.Fork.join f) w)
+      | 5 => V.list <$> (Array.toList <$> Hegel.Property.Branch.mapConcurrently (fun _ => drawOne) #[0, 1, 2])
+      | 6 => do
+        let (a, b) ← Hegel.Property.Branch.concurrently drawOne drawOne
+        pure (V.pair a b)
+      | _ => drawOne
     let w ← forAll (Gen.int 0 5) "extra"
     if shape == 1 then assume (v.weight % 5 != 4)
     if shape == 2 then target (v.weight.toFloat) "weight"
@@ -307,20 +320,3 @@ def runMachine (seed : Nat) (examples : Nat) : IO Verdict := do
 
 end Tests.FuzzHarness
 
-def main (args : List String) : IO UInt32 := do
-  let start := (args[0]? >>= String.toNat?).getD 0
-  let count := (args[1]? >>= String.toNat?).getD 200
-  let examples := (args[2]? >>= String.toNat?).getD 100
-  let machines := args[3]? == some "machines"
-  let mut bugs := 0
-  let mut tally : Std.HashMap String Nat := {}
-  for seed in [start:start + count] do
-    let verdict ← if machines then Tests.FuzzHarness.runMachine seed examples
-      else Tests.FuzzHarness.runOne seed examples
-    match verdict with
-    | .ok kind => tally := tally.insert kind (tally.getD kind 0 + 1)
-    | .bug detail =>
-      bugs := bugs + 1
-      IO.println s!"BUG seed={seed}: {detail}\n"
-  IO.println s!"{count} programs: {tally.toList}, {bugs} bugs"
-  return if bugs == 0 then 0 else 1

@@ -41,7 +41,7 @@ lean_exe hegel_tests where
   root := `Tests.Main
 
 lean_lib Tests where
-  roots := #[`Tests.MacIver, `Tests.Generators, `Tests.Reporting, `Tests.Stateful, `Tests.Safety, `Tests.Concurrency, `Tests.Replay, `Tests.LeanFeatures, `Tests.Registered]
+  roots := #[`Tests.MacIver, `Tests.Generators, `Tests.Reporting, `Tests.Stateful, `Tests.Safety, `Tests.Concurrency, `Tests.Replay, `Tests.LeanFeatures, `Tests.Registered, `Tests.FuzzHarness]
 
 lean_exe hegel_examples where
   root := `Examples.Main
@@ -77,4 +77,4 @@ lean_exe hegel_fuzz where
   root := `Tests.Fuzz
 
 lean_exe hegel_fuzz_harness where
-  root := `Tests.FuzzHarness
+  root := `Tests.FuzzHarnessMain

@@ -94,6 +94,8 @@ private def validateFloatConfig (origin : String) (c : FloatConfig) : Gen Unit :
   if (c.excludeMin && c.min == 1 / 0) || (c.excludeMax && c.max == -1 / 0) ||
       (!c.allowInfinity && (c.min == 1 / 0 || c.max == -1 / 0)) then
     validation origin "Gen.build: floating-point bounds leave no permitted values"
+  if let some reason := c.emptyReason? (if origin == "float32" then 32 else 64) then
+    validation origin s!"Gen.build: {reason}"
 instance : Build (FloatBuilder Float) Float := ⟨fun b => do
   let c := floatConfig id b
   validateFloatConfig "float" c

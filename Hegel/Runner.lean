@@ -151,6 +151,33 @@ private def newSession (name : String) (settings : Settings) : IO Internal.Sessi
     engineIO (Internal.close session)
     throw e
 
+/-- The engine's C API takes failure origins as NUL-terminated strings. Origins that contain
+NUL, or that already look escaped, cross the boundary as hex-encoded UTF-8 behind a prefix,
+which keeps every Lean origin distinct and byte-exact. Other origins pass unchanged. -/
+private def originEscape : String := "\x1bhegel-origin:"
+
+private def hexDigit (n : Nat) : Char := Char.ofNat (if n < 10 then 48 + n else 87 + n)
+
+private def engineOrigin (origin : String) : String :=
+  if origin.contains '\x00' || origin.startsWith originEscape then
+    originEscape ++ String.ofList (origin.toUTF8.data.toList.flatMap fun byte =>
+      [hexDigit (byte.toNat / 16), hexDigit (byte.toNat % 16)])
+  else origin
+
+private def leanOrigin (origin : String) : String := Id.run do
+  if !origin.startsWith originEscape then return origin
+  let digits := (origin.drop originEscape.length).toString.toList.toArray
+  if digits.size % 2 != 0 then return origin
+  let value (c : Char) : Option Nat :=
+    if '0' ≤ c && c ≤ '9' then some (c.toNat - 48)
+    else if 'a' ≤ c && c ≤ 'f' then some (c.toNat - 87) else none
+  let mut bytes := ByteArray.empty
+  for i in [:digits.size / 2] do
+    let some hi := value digits[2 * i]! | return origin
+    let some lo := value digits[2 * i + 1]! | return origin
+    bytes := bytes.push (hi * 16 + lo).toUInt8
+  return (String.fromUTF8? bytes).getD origin
+
 private def execute (session : Internal.Session.type) (property : Property Unit)
     (settings : Settings) : IO CaseResult := do
   let context ← Property.Context.new session settings
@@ -174,7 +201,7 @@ private def execute (session : Internal.Session.type) (property : Property Unit)
     | .discarded => 1
     | .overrun | .error => 2
     | .failed => 3
-  engineIO (Internal.complete session nativeStatus caseResult.origin)
+  engineIO (Internal.complete session nativeStatus (engineOrigin caseResult.origin))
   return { caseResult with cleanupDiagnostics }
 
 /-- Replay a recorded choice sequence once, returning observations from that exact execution. -/
@@ -231,6 +258,7 @@ def check (name : String) (property : Property Unit) (settings : Settings := {})
         outcome := .error
         message := "No valid examples completed; the campaign cannot establish a passing result"
       for (origin, blob) in result.failures do
+        let origin := leanOrigin origin
         if let some reason := skip then
           failures := failures.push {
             origin, blob, message := "Reconstruction was not attempted", annotations := #[]

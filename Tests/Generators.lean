@@ -75,6 +75,31 @@ private def checkLargeExplicitMax : IO Unit := do
     let sizes ← samples 32 gen settings
     require (sizes.any (· > 100)) s!"{label}: explicit maximum was treated as the engine default"
 
+/-- Every pair of special bounds, under every flag combination, either draws a value or is a
+clean configuration error. libhegel 0.43.1 aborts internally on some empty float ranges. -/
+private def checkFloatBoundGrid : IO Unit := do
+  let specials : Array Float := #[0.0, -0.0, 1.0, -1.0, 5e-324, -5e-324,
+    1.7976931348623157e308, -1.7976931348623157e308, 1 / 0, -1 / 0,
+    3.4028234663852886e38, -3.4028234663852886e38, 1.401298464324817e-45]
+  let mut configs := 0
+  for a in specials do
+    for b in specials do
+      for flags in List.range 16 do
+        for width in [32, 64] do
+          let config : Gen.FloatConfig := {
+            min := a, max := b, excludeMin := flags &&& 1 != 0, excludeMax := flags &&& 2 != 0
+            allowInfinity := flags &&& 4 != 0, allowNaN := flags &&& 8 != 0 }
+          let gen : Gen Float := if width == 32 then Float32.toFloat <$> Gen.float32 config
+            else Gen.float config
+          let report ← check "generator/float-bound-grid" (do
+            let _ ← draw gen
+            pure ()) { settings with maxExamples := 20 }
+          let messages := report.message :: (report.failures.toList.map (·.message))
+          require (!messages.any (·.contains "Internal error"))
+            s!"width {width} [{a}, {b}] flags {flags} reached an internal engine error: {report.render}"
+          configs := configs + 1
+  IO.println s!"ok: generator/float-bound-grid ({configs} configurations, no internal errors)"
+
 def run : IO Unit := do
   checkLargeExplicitMax
   rejects "generator/zero-recursive-leaves" do
@@ -109,6 +134,29 @@ def run : IO Unit := do
     let _ ← draw (Gen.build <| Gen.exclusiveMin <|
       Gen.min (1 / 0 : Float) Gen.Builder.float)
     pure ()
+  -- Found by fuzzing: these bounds reached libhegel's internal "no valid float" abort.
+  rejects "generator/plain-float32-positive-to-negative-zero" do
+    let _ ← draw (Gen.float32 {
+      min := 0.0, max := -0.0, allowNaN := false, allowInfinity := false })
+    pure ()
+  rejects "generator/float-exclusive-max-steps-to-disallowed-infinity" do
+    let _ ← draw (Gen.build <| Gen.disallowInfinity <| Gen.exclusiveMax <|
+      Gen.max (-1.7976931348623157e308 : Float) Gen.Builder.float)
+    pure ()
+  for (label, config) in [
+      ("positive-to-negative-zero",
+        ({ min := 0.0, max := -0.0, allowNaN := false, allowInfinity := false } : Gen.FloatConfig)),
+      ("infinity-only", { min := 1 / 0, max := 1 / 0, allowNaN := false, allowInfinity := false }),
+      ("exclusive-step-to-infinity", { min := 1.7976931348623157e308, max := 1 / 0
+                                       excludeMin := true, allowNaN := false
+                                       allowInfinity := false })] do
+    let report ← check s!"generator/plain-float-{label}" (do
+      let _ ← draw (Gen.float config)
+      pure ()) settings
+    require (report.outcome == .error && report.message.contains "Gen.float:" &&
+      !report.message.contains "Internal error") s!"Gen.float {label}: {report.render}"
+    IO.println s!"ok: generator/plain-float-{label} rejected before the engine"
+  checkFloatBoundGrid
   passes "generator/signed-zero-and-permitted-infinity" do
     let zero ← draw (Gen.build <| Gen.min (-0.0 : Float) <|
       Gen.max (0.0 : Float) Gen.Builder.float)

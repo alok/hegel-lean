@@ -134,6 +134,22 @@ def main : IO Unit := do
     let n ← forAll (Gen.int (-100) 100)
     if n < 0 then failure "negative" else if n > 0 then failure "positive"
   require (multiple.failures.size == 2) multiple.render
+  -- Found by fuzzing: a NUL in an origin made the whole campaign an engine error.
+  -- The second origin is the first one's escaped spelling; both must stay distinct.
+  let nulOrigins := #["neg\x00ative", "\x1bhegel-origin:6e6567006174697665", "\x1bhegel-origin:zz"]
+  let nulReport ← fails "origins with embedded NUL and escape-like spellings" do
+    let n ← forAll (Gen.int (-100) 100)
+    if n < -50 then failure nulOrigins[0]!
+    else if n < 0 then failure nulOrigins[1]!
+    else if n > 0 then failure nulOrigins[2]!
+  let origins := nulReport.failures.map (·.origin)
+  require (origins.qsort (· < ·) == nulOrigins.qsort (· < ·)) s!"Origins changed: {origins}"
+  for f in nulReport.failures do
+    match ← f.replayToken with
+    | some token =>
+      require ((decodeReplayToken (encodeReplayToken token)).toOption == some token)
+        s!"NUL origin token roundtrip failed for {f.origin.quote}"
+    | none => require false "missing replay token"
   rejects "inverted bounds" (draw (Gen.int 10 0) *> pure ())
   rejects "empty choice" (draw (Gen.element (#[] : Array Nat)) *> pure ())
   rejects "oversized collection" (draw (Gen.list Gen.bool 0 (2^64)) *> pure ())

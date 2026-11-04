@@ -265,7 +265,9 @@ def usize : Gen USize := Nat.toUSize <$> nat 0 (USize.size - 1)
 def isize : Gen ISize := Int.toISize <$> int (-(USize.size / 2 : Nat)) (USize.size / 2 - 1)
 
 def float32 (config : FloatConfig := {}) : Gen Float32 :=
-  Float.toFloat32 <$> nativeValidation "float32" (Internal.float32 · config.min config.max
+  if let some reason := config.emptyReason? 32 then
+    validation "float32" s!"Gen.float32: {reason}"
+  else Float.toFloat32 <$> nativeValidation "float32" (Internal.float32 · config.min config.max
     config.allowNaN
     config.allowInfinity config.excludeMin config.excludeMax)
 

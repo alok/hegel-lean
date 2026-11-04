@@ -27,7 +27,8 @@ def GeneralCategory.code : GeneralCategory → String
   | .Sk => "Sk" | .So => "So" | .Zs => "Zs" | .Zl => "Zl" | .Zp => "Zp"
   | .Cc => "Cc" | .Cf => "Cf" | .Cs => "Cs" | .Co => "Co" | .Cn => "Cn"
 
-/-- A Unicode alphabet. Explicit inclusion is applied before exclusion; surrogates are removed. -/
+/-- A Unicode alphabet; surrogates are removed. A character may not be both included and
+excluded: the engine rejects such overlaps as a configuration failure. -/
 structure Alphabet where
   codec : Codec := .utf8
   minCodepoint : Nat := 0

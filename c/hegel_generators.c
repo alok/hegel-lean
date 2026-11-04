@@ -13,7 +13,7 @@
     if (rc != HEGEL_OK) return hegel_lean_engine_error(s, rc); } while (0)
 #define CSTRING(str) do { \
     if (memchr(lean_string_cstr(str), 0, lean_string_size(str) - 1)) \
-        return hegel_lean_error(HEGEL_E_INVALID_ARG, "Embedded NUL in C-string argument"); \
+        return hegel_lean_error(HEGEL_E_INVALID_ARG, "Embedded NUL in C-string argument " #str); \
 } while (0)
 
 LEAN_EXPORT lean_obj_res lean_hegel_float32(b_lean_obj_arg handle, double lo, double hi,

@@ -23,7 +23,7 @@ jobs:
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
           echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
       - name: Build
-        run: lake build hegel_tests hegel_examples hegel_lean_examples hegel_maciver_tests hegel_panic_probe hegel_concurrency_tests hegel_adjacent_sweep
+        run: lake build hegel_tests hegel_examples hegel_lean_examples hegel_maciver_tests hegel_panic_probe hegel_concurrency_tests hegel_adjacent_sweep hegel_fuzz hegel_fuzz_harness
       - name: Check engine release discovery
         run: python3 scripts/test_engine_update.py
       - name: Check native ABI
@@ -34,6 +34,10 @@ jobs:
         run: python3 scripts/test_elaboration.py
       - name: Integration tests
         run: lake test
+      - name: Self-hosted fuzz smoke
+        run: |
+          lake exe hegel_fuzz 2 200
+          lake exe hegel_fuzz_harness 0 200 100
       - name: Panic safety regression
         run: python3 scripts/test_safety.py
       - name: Concurrency watchdog

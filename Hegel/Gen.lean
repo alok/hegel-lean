@@ -177,9 +177,44 @@ structure FloatConfig where
   excludeMin : Bool := false
   excludeMax : Bool := false
 
+/-- The adjacent representable value in the given width (32 or 64), toward `+∞` or `-∞`.
+Infinities and NaN are returned unchanged. -/
+private def floatStep (width : Nat) (up : Bool) (x : Float) : Float :=
+  if x.isNaN || x.isInf then x
+  else if width == 32 then
+    let f := x.toFloat32
+    let bits := f.toBits
+    let next := if f == 0 then (if up then 1 else 0x80000001)
+      else if (f > 0) == up then bits + 1 else bits - 1
+    (Float32.ofBits next).toFloat
+  else
+    let bits := x.toBits
+    let next := if x == 0 then (if up then 1 else 0x8000000000000001)
+      else if (x > 0) == up then bits + 1 else bits - 1
+    Float.ofBits next
+
+/-- Reject bounds that leave no permitted value before the engine sees them. The engine
+orders `-0.0` before `+0.0`, and an exclusive bound steps to the adjacent value in the
+requested width. libhegel 0.43.1 aborts with an internal error ("no valid float for this
+choice") on `[+0.0, -0.0]` and on infinity-only ranges with infinities disallowed. -/
+def FloatConfig.emptyReason? (c : FloatConfig) (width : Nat := 64) : Option String :=
+  if c.min.isNaN || c.max.isNaN then none -- the engine reports NaN bounds itself
+  else
+    let lo := if c.excludeMin then floatStep width true c.min else c.min
+    let hi := if c.excludeMax then floatStep width false c.max else c.max
+    let reversed := lo > hi || (lo == 0 && hi == 0 && lo.toBits == 0 && hi.toBits != 0)
+    if reversed then
+      some "floating-point bounds leave no permitted values"
+    else if !c.allowNaN && !c.allowInfinity && (lo == 1 / 0 || hi == -1 / 0) then
+      some "floating-point bounds admit only infinities, which are disallowed"
+    else none
+
 def float (config : FloatConfig := {}) : Gen Float :=
-  native (Internal.float · config.min config.max config.allowNaN config.allowInfinity
-    config.excludeMin config.excludeMax)
+  match config.emptyReason? with
+  -- Matches the engine's own invalid-argument handling for this generator.
+  | some reason => invalid s!"Gen.float: {reason}"
+  | none => native (Internal.float · config.min config.max config.allowNaN
+      config.allowInfinity config.excludeMin config.excludeMax)
 
 private def sizes (min max : Nat) : Gen (UInt64 × UInt64) := do
   if min > max then invalid "Minimum size exceeds maximum size"

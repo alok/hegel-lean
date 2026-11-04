@@ -72,3 +72,9 @@ lean_exe hegel_lean_tests where
 
 lean_exe hegel_lean_examples where
   root := `Examples.Lean
+
+lean_exe hegel_fuzz where
+  root := `Tests.Fuzz
+
+lean_exe hegel_fuzz_harness where
+  root := `Tests.FuzzHarness

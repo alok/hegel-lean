@@ -141,7 +141,7 @@ lean_object *hegel_lean_unit_ok(void) { return unit_ok(); }
     if (rc_ != HEGEL_OK) return engine_error(s, rc_); } while (0)
 #define CSTRING(str) do { \
     if (memchr(lean_string_cstr(str), 0, lean_string_size(str) - 1)) \
-        return error_value(HEGEL_E_INVALID_ARG, "Embedded NUL in C-string argument"); \
+        return error_value(HEGEL_E_INVALID_ARG, "Embedded NUL in C-string argument " #str); \
 } while (0)
 static void silent_output(void *data, const char *line, size_t len) {
     output_state *output = data;

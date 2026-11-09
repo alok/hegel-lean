@@ -175,8 +175,36 @@ partial def Prog.normalize : Prog → Prog
   | p => p
 
 inductive Verdict where
-  | ok (detail : String)
+  | passed | replayed | exhausted
   | bug (detail : String)
+
+private def checkReport (report : Report) (property : Property Unit) (settings : Settings)
+    (shown : String.Slice) : IO Verdict := do
+  match report.outcome with
+  | .passed => return .passed
+  | .error =>
+    if report.cleanupDiagnostics.isEmpty && report.failures.isEmpty &&
+        (report.message.startsWith "FailedHealthCheck: FilterTooMuch" ||
+         report.message.startsWith "Unsatisfiable:") then return .exhausted
+    return .bug s!"engine/runner error for {shown}\n{report.render}"
+  | .nondeterministic => return .bug s!"nondeterministic for {shown}\n{report.render}"
+  | .failed =>
+    if report.failures.isEmpty then return .bug s!"no failure evidence for {shown}"
+    for f in report.failures do
+      let some token ← f.replayToken | return .bug s!"failure without replay data for {shown}"
+      for _ in [:3] do
+        let again ← replay f.blob property settings
+        if again.status != .failed || again.origin != f.origin ||
+            again.annotations != f.annotations || !again.cleanupDiagnostics.isEmpty then
+          return .bug s!"replay diverged for {shown}\n{repr again.status} {again.message}"
+      match decodeReplayToken (encodeReplayToken token) with
+      | .error e => return .bug s!"token decode {repr e}"
+      | .ok decoded =>
+        let r ← replayToken decoded property settings
+        if r.outcome != .failed || !r.failures.any (fun reproduced =>
+            reproduced.origin == f.origin && reproduced.annotations == f.annotations) then
+          return .bug s!"token replay diverged for {shown}\n{r.render}"
+    return .replayed
 
 def runOne (seed : Nat) (examples : Nat) : IO Verdict := do
   let (p, rng) := (prog 3).run ⟨seed.toUInt64 * 7919 + 1⟩
@@ -209,36 +237,7 @@ def runOne (seed : Nat) (examples : Nat) : IO Verdict := do
   let settings : Settings := { seed := some seed.toUInt64, maxExamples := examples.toUInt64, database := none }
   let report ← check s!"program {seed}" property settings
   let shown := (reprStr p).take 600
-  match report.outcome with
-  | .passed => return .ok "passed"
-  | .error =>
-    -- Health checks on heavily filtered programs are legitimate engine verdicts.
-    if (report.message.splitOn "FailedHealthCheck").length > 1 ||
-       (report.message.splitOn "Unsatisfiable").length > 1 then return .ok "health"
-    return .bug s!"engine/runner error for {shown}\n{report.render}"
-  | .nondeterministic => return .bug s!"nondeterministic for {shown}\n{report.render}"
-  | .failed =>
-    for f in report.failures do
-      if f.blob.isEmpty then return .bug s!"failure without blob for {shown}"
-      let first ← replay f.blob property settings
-      for _ in [:2] do
-        let again ← replay f.blob property settings
-        if again.status != .failed || again.origin != f.origin then
-          return .bug s!"replay changed status/origin for {shown}\n{repr again.status} {again.message}"
-        if again.annotations != first.annotations then
-          return .bug s!"replay changed annotations for {shown}\n{first.annotations} vs {again.annotations}"
-      if first.annotations != f.annotations then
-        return .bug s!"report annotations differ from replay for {shown}\n{f.annotations} vs {first.annotations}"
-      match ← f.replayToken with
-      | none => return .bug "no replay token"
-      | some token =>
-        match decodeReplayToken (encodeReplayToken token) with
-        | .error e => return .bug s!"token decode {repr e}"
-        | .ok decoded =>
-          let r ← replayToken decoded property settings
-          if r.outcome != .failed then
-            return .bug s!"token replay {repr r.outcome} for {shown}\n{r.render}"
-    return .ok "failed+replayed"
+  checkReport report property settings shown
 
 /-! ## Random state machines -/
 
@@ -297,26 +296,7 @@ def runMachine (seed : Nat) (examples : Nat) : IO Verdict := do
   let settings : Settings := { seed := some seed.toUInt64, maxExamples := examples.toUInt64, database := none }
   let report ← check s!"machine {seed}" property settings
   let shown := (reprStr (kinds, inv, steps)).take 600
-  match report.outcome with
-  | .passed => return .ok "passed"
-  | .error =>
-    if (report.message.splitOn "FailedHealthCheck").length > 1 ||
-       (report.message.splitOn "Unsatisfiable").length > 1 then return .ok "health"
-    return .bug s!"machine error for {shown}\n{report.render}"
-  | .nondeterministic => return .bug s!"machine nondeterministic for {shown}\n{report.render}"
-  | .failed =>
-    for f in report.failures do
-      let first ← replay f.blob property settings
-      for _ in [:2] do
-        let again ← replay f.blob property settings
-        if again.status != .failed || again.origin != f.origin || again.annotations != first.annotations then
-          return .bug s!"machine replay diverged for {shown}"
-      if first.annotations != f.annotations then
-        return .bug s!"machine report/replay annotations differ for {shown}\n{f.annotations}\n{first.annotations}"
-      if let some token ← f.replayToken then
-        let r ← replayToken token property settings
-        if r.outcome != .failed then return .bug s!"machine token replay {repr r.outcome} for {shown}\n{r.render}"
-    return .ok "failed+replayed"
+  checkReport report property settings shown
 
 end Tests.FuzzHarness
 

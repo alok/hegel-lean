@@ -207,6 +207,7 @@ def run : IO Unit := do
       stepCount := some 2
     }
   require (← observedOverlap.atomically get) "No actual worker overlap was observed in the campaign"
+  let sawTwoWorkers ← IO.mkRef false
   passes "concurrency groups and joined invariants" do
     Hegel.Stateful.Concurrent.run (.between 2 3) {
       initial := return { state := ← Std.Mutex.new (0, 0, none, false) }
@@ -215,6 +216,10 @@ def run : IO Unit := do
       invariants := #[joinedInvariant]
       stepCount := some 3
     }
+    let notes ← (← getContext).journal.get
+    if notes.any (fun n => n.kind == .annotation && n.text.endsWith ", workers 2") then
+      sawTwoWorkers.set true
+  require (← sawTwoWorkers.get) "Round traces always reported the maximum of three workers"
   passes "concurrent workers share native pools" do
     Hegel.Stateful.Concurrent.run (.fixed 3) {
       initial := do

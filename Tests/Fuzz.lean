@@ -346,56 +346,94 @@ def all : List (String × Property Unit) := [
 
 end Tests.Fuzz
 
+private inductive ProbeExpectation where
+  | validation (origin : String)
+  | errorPrefix (prefix_ : String)
+  | exhausted (prefix_ : String)
+
+private def ProbeExpectation.describe : ProbeExpectation → String
+  | .validation origin => s!"validation failure {origin.quote}"
+  | .errorPrefix msg => s!"error beginning with {msg.quote}"
+  | .exhausted msg => s!"rejection exhaustion beginning with {msg.quote}"
+
+private def ProbeExpectation.matches (expected : ProbeExpectation) (report : Hegel.Report) : Bool :=
+  report.cleanupDiagnostics.isEmpty && match expected with
+    | .validation origin =>
+      report.outcome == .failed && report.failures.size == 1 && report.failures.all fun f =>
+        f.origin == origin && !f.blob.isEmpty && f.cleanupDiagnostics.isEmpty
+    | .errorPrefix prefix_ =>
+      report.outcome == .error && report.failures.isEmpty && report.message.startsWith prefix_
+    | .exhausted prefix_ =>
+      report.outcome == .error && report.stats.valid == 0 && report.stats.invalid > 0 &&
+        report.failures.isEmpty && report.message.startsWith prefix_
+
 open Hegel in
-/-- Invalid configurations must fail (never pass, crash, or hang). -/
-def probes : List (String × Gen String) := [
-  ("float [+0, -0]", toString <$> Gen.float { min := 0.0, max := -0.0, allowNaN := false }),
-  ("float32 [+0, -0]", toString <$> Gen.float32 { min := 0.0, max := -0.0, allowNaN := false }),
-  ("float only +inf, inf disallowed", toString <$> Gen.float { min := 1 / 0, allowNaN := false, allowInfinity := false }),
-  ("bool p=1.5", toString <$> Gen.bool 1.5),
-  ("bool p=NaN", toString <$> Gen.bool (0 / 0)),
-  ("float min>max", toString <$> Gen.float { min := 1, max := 0 }),
-  ("float min=NaN", toString <$> Gen.float { min := 0 / 0 }),
-  ("float32 unrepresentable", toString <$> Gen.float32 { min := 0.1, max := 0.1 }),
-  ("text minCp>maxCp", Gen.text { minCodepoint := 100, maxCodepoint := 50 }),
-  ("text surrogates only", Gen.text { minSize := 1, minCodepoint := 0xd800, maxCodepoint := 0xdfff }),
-  ("text bad codec", Gen.text { codec := "klingon" }),
-  ("text ascii high cps", Gen.text { minSize := 1, codec := "ascii", minCodepoint := 200 }),
-  ("regex unbalanced", Gen.regex "("),
-  ("regex with literal NUL", Gen.regex "a\x00"),
-  ("regex empty language", Gen.regex "[^\\s\\S]"),
-  ("domain 3", Gen.domain 3),
-  ("alphabet empty only", Alphabet.text (Alphabet.only "") 1 2),
-  ("alphabet min>max cp", Alphabet.text { minCodepoint := 9, maxCodepoint := 3 } 0 2),
-  ("alphabet overlap", Alphabet.text { includeCharacters := "a", excludeCharacters := "a" } 0 2),
-  ("alphabet ascii+latin cat", Alphabet.text { codec := .ascii, categories := some #[.Lo] } 1 2),
-  ("alphabet regex bad", Alphabet.regex Alphabet.lower "(("),
-  ("int min>max", toString <$> Gen.int 2 1),
-  ("bytes min>max", toString <$> (ByteArray.size <$> Gen.bytes 3 2)),
-  ("array 2^64", toString <$> (Array.size <$> Gen.array Gen.bool 0 (2 ^ 64))),
-  ("unique impossible", toString <$> (Array.size <$> Gen.uniqueArray Gen.bool 3 3)),
-  ("set impossible", toString <$> ((·.size) <$> Gen.set Gen.bool 3 3)),
-  ("element empty", toString <$> Gen.element (#[] : Array Nat)),
-  ("frequency zero", toString <$> Gen.frequency #[(0, pure 1)]),
-  ("enum bad range", toString <$> Gen.enum #[1, 2] 1 5),
-  ("date invalid", toString <$> (repr <$> Gen.date ⟨2001, 2, 29⟩ ⟨2002, 1, 1⟩)),
-  ("time reversed", toString <$> (repr <$> Gen.time ⟨5, 0, 0, 0⟩ ⟨4, 0, 0, 0⟩)),
-  ("duration negative", toString <$> (repr <$> Gen.duration ⟨-1⟩ ⟨5⟩)),
-  ("uuid v16", toString <$> Gen.uuid (some 16)),
-  ("collection with bad", toString <$> Collection.with 3 2 fun _ => pure 0),
-  ("nonEmpty zero", toString <$> ((·.toList.length) <$> Gen.nonEmpty Gen.bool 0 0))]
+private def probes : List (String × Gen String × ProbeExpectation) := [
+  ("float [+0, -0]", toString <$> Gen.float { min := 0.0, max := -0.0, allowNaN := false },
+    .errorPrefix "Gen.float:"),
+  ("float32 [+0, -0]", toString <$> Gen.float32 { min := 0.0, max := -0.0, allowNaN := false },
+    .validation "generator/float32"),
+  ("float only +inf, inf disallowed", toString <$> Gen.float { min := 1 / 0, allowNaN := false, allowInfinity := false },
+    .errorPrefix "Gen.float:"),
+  ("bool p=1.5", toString <$> Gen.bool 1.5, .errorPrefix "libhegel (-5):"),
+  ("bool p=NaN", toString <$> Gen.bool (0 / 0), .errorPrefix "libhegel (-5):"),
+  ("float min>max", toString <$> Gen.float { min := 1, max := 0 }, .errorPrefix "Gen.float:"),
+  ("float min=NaN", toString <$> Gen.float { min := 0 / 0 }, .errorPrefix "libhegel (-5):"),
+  ("float32 unrepresentable", toString <$> Gen.float32 { min := 0.1, max := 0.1 },
+    .validation "generator/float32"),
+  ("text minCp>maxCp", Gen.text { minCodepoint := 100, maxCodepoint := 50 }, .errorPrefix "libhegel (-5):"),
+  ("text surrogates only", Gen.text { minSize := 1, minCodepoint := 0xd800, maxCodepoint := 0xdfff },
+    .errorPrefix "libhegel (-5):"),
+  ("text bad codec", Gen.text { codec := "klingon" }, .errorPrefix "libhegel (-5):"),
+  ("text ascii high cps", Gen.text { minSize := 1, codec := "ascii", minCodepoint := 200 },
+    .errorPrefix "libhegel (-5):"),
+  ("regex unbalanced", Gen.regex "(", .errorPrefix "libhegel (-5):"),
+  ("regex with literal NUL", Gen.regex "a\x00", .errorPrefix "libhegel (-5):"),
+  ("regex empty language", Gen.regex "[^\\s\\S]", .exhausted "Unsatisfiable:"),
+  ("domain 3", Gen.domain 3, .errorPrefix "Gen.domain:"),
+  ("alphabet empty only", Alphabet.text (Alphabet.only "") 1 2, .validation "generator/alphabet"),
+  ("alphabet min>max cp", Alphabet.text { minCodepoint := 9, maxCodepoint := 3 } 0 2,
+    .validation "generator/text"),
+  ("alphabet overlap", Alphabet.text { includeCharacters := "a", excludeCharacters := "a" } 0 2,
+    .validation "generator/alphabet"),
+  ("alphabet ascii+latin cat", Alphabet.text { codec := .ascii, categories := some #[.Lo] } 1 2,
+    .validation "generator/alphabet"),
+  ("alphabet regex bad", Alphabet.regex Alphabet.lower "((", .validation "generator/alphabet"),
+  ("int min>max", toString <$> Gen.int 2 1, .errorPrefix "Gen.int:"),
+  ("bytes min>max", toString <$> (ByteArray.size <$> Gen.bytes 3 2),
+    .errorPrefix "Minimum size exceeds maximum size"),
+  ("array 2^64", toString <$> (Array.size <$> Gen.array Gen.bool 0 (2 ^ 64)),
+    .errorPrefix "Collection size exceeds the engine's UInt64 range"),
+  ("unique impossible", toString <$> (Array.size <$> Gen.uniqueArray Gen.bool 3 3),
+    .exhausted "FailedHealthCheck: FilterTooMuch"),
+  ("set impossible", toString <$> ((·.size) <$> Gen.set Gen.bool 3 3),
+    .exhausted "FailedHealthCheck: FilterTooMuch"),
+  ("element empty", toString <$> Gen.element (#[] : Array Nat), .errorPrefix "Gen.element requires"),
+  ("frequency zero", toString <$> Gen.frequency #[(0, pure 1)], .validation "generator/frequency"),
+  ("enum bad range", toString <$> Gen.enum #[1, 2] 1 5, .validation "generator/enum"),
+  ("date invalid", toString <$> (repr <$> Gen.date ⟨2001, 2, 29⟩ ⟨2002, 1, 1⟩),
+    .validation "generator/date"),
+  ("time reversed", toString <$> (repr <$> Gen.time ⟨5, 0, 0, 0⟩ ⟨4, 0, 0, 0⟩),
+    .validation "generator/time"),
+  ("duration negative", toString <$> (repr <$> Gen.duration ⟨-1⟩ ⟨5⟩), .validation "generator/duration"),
+  ("uuid v16", toString <$> Gen.uuid (some 16), .validation "generator/uuid"),
+  ("collection with bad", toString <$> Collection.with 3 2 fun _ => pure 0,
+    .errorPrefix "Collection.with: require"),
+  ("nonEmpty zero", toString <$> ((·.toList.length) <$> Gen.nonEmpty Gen.bool 0 0),
+    .validation "generator/nonEmpty")]
 
 open Hegel in
 def runProbes : IO Nat := do
   let mut bad := 0
-  for (name, gen) in probes do
+  for (name, gen, expected) in probes do
     let report ← check name (do let _ ← Property.forAllWith (fun s => s) gen; pure ())
       { seed := some 0, maxExamples := 50, database := none }
     let kind := match report.outcome with
       | .passed => "PASSED" | .failed => "failure" | .error => "error" | .nondeterministic => "flaky"
-    if report.outcome == .passed then bad := bad + 1
     let detail := (report.failures[0]?.map (·.origin)).getD report.message
-    if (detail.splitOn "Internal error").length > 1 then bad := bad + 1
+    unless expected.matches report do
+      bad := bad + 1
+      IO.println s!"FAIL: {name} expected {expected.describe}\n{report.render}"
     IO.println s!"probe {kind}: {name}: {detail.take 160}"
   return bad
 

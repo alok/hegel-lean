@@ -1659,7 +1659,7 @@
   ],
   "verification": {
     "frontendVersion": "2.0.0",
-    "leanVersion": "4.35.0",
+    "leanVersion": "4.36.0",
     "engineVersion": "0.43.1",
     "localPlatform": "macOS arm64",
     "commands": [
@@ -1677,23 +1677,23 @@
       "lake exe hegel_fuzz_harness 0 50 50 machines"
     ],
     "platformCI": ".github/workflows/ci.yml",
-    "date": "2026-11-09"
+    "date": "2026-11-16"
   },
   "upstreamReview": {
-    "date": "2026-11-09",
+    "date": "2026-11-16",
     "reviewedSourceCommit": "603eec1c70f4f6e1e445cdf0847c6723fd63997e",
     "commitsSincePinnedSource": 58,
     "sourcePinChanged": false,
-    "engineCandidate": "0.51.0",
+    "engineCandidate": "0.51.6",
     "engineCandidateRepository": "https://github.com/hegeldev/hegel",
     "engineCandidatePublished": false,
     "notes": [
-      "The reviewed reference head is unchanged. The 0.51.0 candidate declares rules and invariants before starting the machine and records the active worker count for each round.",
+      "The reviewed reference head is unchanged. The 0.51.6 candidate preserves the observed assertion and journal when the engine runs a single unrecorded workload case.",
       "Existing ABI checks, Unicode validation, rule-index failure origins, trace elision, retained abort statistics, and explicit replay exhaustion already cover the corresponding reference changes. Worker journals are folded after joins; top-level test identity uses exact declaration names.",
-      "Engine-owned capture, caveats, replay-run handling, and length-delimited string inputs and outputs remain on the local 0.51.0 candidate; all 39 fixed-seed regressions pass, but the wider 200-seed shrinking diagnostic still fails.",
+      "The local 0.51.6 candidate passed all 39 fixed regressions. Its 200 adjacent-UInt64 results matched the prior candidate seed for seed, including the two discovery misses.",
       "New engine error-kind classification, stopOnFirstFailure, profile and Unicode-version settings, rejected-attempt pool restoration, and sequence generators remain outside the pinned public API. The feature inventory still targets sourceCommit.",
       "Existing Lean defaults, finite enumeration metadata, explicit single-attempt replay, stateful configuration, ordered weighted choice, and unary floating-bound exclusivity modifiers remain intentional public contracts."
     ],
-    "validationRecord": "docs/maintenance-2026-11-09.md"
+    "validationRecord": "docs/maintenance-2026-11-16.md"
   }
 }

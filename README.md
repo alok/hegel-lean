@@ -15,7 +15,7 @@ open Hegel Hegel.Property
 def main : IO UInt32 := runTests hegel_suite%
 ```
 
-The frontend uses native **libhegel 0.43.1** and **Lean 4.35.0**. It includes typed generator
+The frontend uses native **libhegel 0.43.1** and **Lean 4.36.0**. It includes typed generator
 builders, finite enumeration and filtering, native recursion budgets, source-aware assertions,
 resource management, pools, sequential and concurrent state machines, forks, structured reports,
 and persistent replay. The [port inventory](scripts/port-api.json) maps the reference API's
@@ -51,7 +51,7 @@ In another Lake project using the same Lean toolchain:
 require «hegel-lean» from git "https://github.com/alok/hegel-lean" @ "main"
 ```
 
-The immutable `v2.0.0` release uses Lean 4.34.0; current `main` uses Lean 4.35.0.
+The immutable `v2.0.0` release uses Lean 4.34.0; current `main` uses Lean 4.36.0.
 Run `lake update` and commit `lake-manifest.json` to retain the resolved revision. Engine fetching
 and native linking propagate to the consumer's executable. Properties run in compiled Lake
 executables; the native engine is not loaded into the editor's `#eval` process.
@@ -164,8 +164,8 @@ must use suitable synchronization, and clone creation must occur in a consistent
 
 See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
 The [v2 validation details](docs/lean-integration.md#validation) cover deriving, proof-carrying
-shrinking, test registration, and downstream Lake use. The [November 9 maintenance record](docs/maintenance-2026-11-09.md)
-covers the fuzz harness fixes and the shrinking results for libhegel 0.51.0.
+shrinking, test registration, and downstream Lake use. The [November 16 maintenance record](docs/maintenance-2026-11-16.md)
+covers the Lean 4.36.0 upgrade and the libhegel 0.51.6 evaluation.
 
 `lake test` executes the real pinned engine. Tests cover bounds, enumeration, native recursion,
 shrinking minima, exact replay, persistence, source identities, cleanup, pool lifecycle,

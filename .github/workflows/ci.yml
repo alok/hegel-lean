@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   test:
-    timeout-minutes: 10
+    timeout-minutes: ${{ matrix.os == 'macos-15' && 15 || 10 }}
     strategy:
       fail-fast: false
       matrix:

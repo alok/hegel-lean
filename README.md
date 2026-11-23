@@ -164,8 +164,8 @@ must use suitable synchronization, and clone creation must occur in a consistent
 
 See the [v1 validation record](docs/validation.md) for suite coverage and the concrete audit fixes.
 The [v2 validation details](docs/lean-integration.md#validation) cover deriving, proof-carrying
-shrinking, test registration, and downstream Lake use. The [November 16 maintenance record](docs/maintenance-2026-11-16.md)
-covers the Lean 4.36.0 upgrade and the libhegel 0.51.6 evaluation.
+shrinking, test registration, and downstream Lake use. The [November 23 maintenance record](docs/maintenance-2026-11-23.md)
+covers the libhegel 0.53.1 compatibility tests and shrinking results.
 
 `lake test` executes the real pinned engine. Tests cover bounds, enumeration, native recursion,
 shrinking minima, exact replay, persistence, source identities, cleanup, pool lifecycle,

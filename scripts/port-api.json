@@ -1680,20 +1680,20 @@
     "date": "2026-11-16"
   },
   "upstreamReview": {
-    "date": "2026-11-16",
+    "date": "2026-11-23",
     "reviewedSourceCommit": "603eec1c70f4f6e1e445cdf0847c6723fd63997e",
     "commitsSincePinnedSource": 58,
     "sourcePinChanged": false,
-    "engineCandidate": "0.51.6",
+    "engineCandidate": "0.53.1",
     "engineCandidateRepository": "https://github.com/hegeldev/hegel",
     "engineCandidatePublished": false,
     "notes": [
-      "The reviewed reference head is unchanged. The 0.51.6 candidate preserves the observed assertion and journal when the engine runs a single unrecorded workload case.",
+      "The reference head is unchanged. The 0.53.1 candidate uses explicit nanosecond precision and supplies summaries and full failure messages to native completion.",
       "Existing ABI checks, Unicode validation, rule-index failure origins, trace elision, retained abort statistics, and explicit replay exhaustion already cover the corresponding reference changes. Worker journals are folded after joins; top-level test identity uses exact declaration names.",
-      "The local 0.51.6 candidate passed all 39 fixed regressions. Its 200 adjacent-UInt64 results matched the prior candidate seed for seed, including the two discovery misses.",
+      "The local 0.53.1 candidate passed all 39 fixed regressions. Its 200 adjacent-UInt64 results matched the prior candidate seed for seed, including two discovery misses.",
       "New engine error-kind classification, stopOnFirstFailure, profile and Unicode-version settings, rejected-attempt pool restoration, and sequence generators remain outside the pinned public API. The feature inventory still targets sourceCommit.",
       "Existing Lean defaults, finite enumeration metadata, explicit single-attempt replay, stateful configuration, ordered weighted choice, and unary floating-bound exclusivity modifiers remain intentional public contracts."
     ],
-    "validationRecord": "docs/maintenance-2026-11-16.md"
+    "validationRecord": "docs/maintenance-2026-11-23.md"
   }
 }
